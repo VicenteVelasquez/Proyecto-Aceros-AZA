@@ -1,7 +1,7 @@
 from flask import Flask, request, jsonify
 from flask_sqlalchemy import SQLAlchemy
 from flask_cors import CORS
-from werkzeug.security import check_password_hash  # <--- Importante para verificar el hash
+from werkzeug.security import check_password_hash 
 
 app = Flask(__name__)
 CORS(app)  # Habilita el intercambio de recursos entre puertos
