@@ -1,0 +1,45 @@
+{% extends "base.html" %}
+
+{% block title %}Reportes - Supervisor Aceros AZA{% endblock %}
+{% block page_heading %}Reportes de Supervisión{% endblock %}
+{% set active_section = 'reportes' %}
+
+{% block content %}
+<div class="alert alert-warning d-flex align-items-center gap-2 mb-0" role="note">
+  <i class="fa-solid fa-flask" aria-hidden="true"></i>
+  <span><strong>Modo demostración:</strong> los archivos contienen los mismos datos ficticios del panel.</span>
+</div>
+<section class="aza-card">
+  <div class="aza-card-header"><span><i class="fa-solid fa-file-export me-2"></i> GENERAR REPORTE</span></div>
+  <div class="aza-card-body">
+    <p>Selecciona el contenido y formato para descargar los indicadores de supervisión.</p>
+    <form action="{{ url_for('supervisor_reportes_descargar') }}" method="get" class="row g-3 align-items-end">
+      <div class="col-lg-5">
+        <label class="form-label fw-bold" for="tipo-reporte">Contenido del reporte</label>
+        <select class="form-select" id="tipo-reporte" name="tipo" required>
+          {% for key, label in report_types.items() %}
+          <option value="{{ key }}">{{ label }}</option>
+          {% endfor %}
+        </select>
+      </div>
+      <div class="col-lg-4">
+        <label class="form-label fw-bold" for="formato-reporte">Formato de archivo</label>
+        <select class="form-select" id="formato-reporte" name="formato" required>
+          <option value="excel">Excel (.xlsx)</option>
+          <option value="pdf">PDF (.pdf)</option>
+          <option value="word">Word (.docx)</option>
+        </select>
+      </div>
+      <div class="col-lg-3">
+        <button type="submit" class="btn btn-success w-100"><i class="fa-solid fa-download me-1"></i> Descargar reporte</button>
+      </div>
+    </form>
+  </div>
+</section>
+<section class="aza-card">
+  <div class="aza-card-body">
+    <h2 class="h5">Origen de los datos</h2>
+    <p class="mb-0">El panel y las exportaciones usan datos de demostración hasta conectar Supabase y los microservicios.</p>
+  </div>
+</section>
+{% endblock %}

@@ -1,0 +1,14 @@
+{% extends "base.html" %}
+{% block title %}Recurso no encontrado - AZA{% endblock %}
+{% block content %}
+<div class="container text-center py-5">
+  <div class="row justify-content-center">
+    <div class="col-md-6 aza-card p-5 shadow-sm">
+      <div class="text-success mb-3" style="font-size: 3.5rem;"><i class="fa-solid fa-triangle-exclamation"></i></div>
+      <h2 class="fw-bold text-dark mb-2">Página no encontrada (404)</h2>
+      <p class="text-muted mb-4">El módulo, ruta o recurso solicitado no existe en el sistema de monitoreo.</p>
+      <a href="{{ url_for('home') }}" class="btn btn-success btn-sm px-4">Ir a la Pantalla Principal</a>
+    </div>
+  </div>
+</div>
+{% endblock %}

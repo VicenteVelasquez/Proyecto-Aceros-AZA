@@ -1,13 +1,23 @@
+import os
 from flask import Flask, request, jsonify
 from flask_sqlalchemy import SQLAlchemy
 from flask_cors import CORS
+from dotenv import load_dotenv
+
+# Carga las variables de entorno desde el archivo .env local
+load_dotenv()
 
 app = Flask(__name__)
 CORS(app)
 
-# Conexión a la base de datos en PostgreSQL (Supabase)
-app.config['SQLALCHEMY_DATABASE_URI'] = 'postgresql://postgres.mtccxutquyokrysolcfr:bicho.7892614@aws-1-us-west-2.pooler.supabase.com:6543/postgres'
+# Conexión a la base de datos obtenida de forma segura desde el entorno
+database_url = os.getenv("DATABASE_URL")
+if not database_url:
+    raise RuntimeError("Error crítico: La variable de entorno DATABASE_URL no está configurada.")
+
+app.config['SQLALCHEMY_DATABASE_URI'] = database_url
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
+
 db = SQLAlchemy(app)
 
 # Modelo para la tabla de lecturas M2M
@@ -31,4 +41,5 @@ def obtener_capturas():
         return jsonify({"status": "error", "mensaje": str(e)}), 500
 
 if __name__ == '__main__':
-    app.run(host='0.0.0.0', port=5003, debug=True)
+    debug_mode = os.getenv("FLASK_DEBUG", "True").lower() == "true"
+    app.run(host='0.0.0.0', port=5003, debug=debug_mode)

@@ -1,14 +1,23 @@
+import os
 from flask import Flask, jsonify
 from src.conexion_db.db import db
 from src.conexion_db.models import RegistroHistorico
+from dotenv import load_dotenv
+
+# Carga las variables de entorno desde el archivo .env local
+load_dotenv()
 
 app = Flask(__name__)
 
 # Configuración para evitar problemas con tildes en JSON
 app.json.ensure_ascii = False
 
-# Conexión a la base de datos central en PostgreSQL
-app.config['SQLALCHEMY_DATABASE_URI'] = 'postgresql://postgres.mtccxutquyokrysolcfr:bicho.7892614@aws-1-us-west-2.pooler.supabase.com:6543/postgres'
+# Conexión a la base de datos obtenida de forma segura desde el entorno
+database_url = os.getenv("DATABASE_URL")
+if not database_url:
+    raise RuntimeError("Error crítico: La variable de entorno DATABASE_URL no está configurada.")
+
+app.config['SQLALCHEMY_DATABASE_URI'] = database_url
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 
 db.init_app(app)
@@ -30,4 +39,6 @@ def obtener_historico():
 if __name__ == '__main__':
     with app.app_context():
         db.create_all()  # Crea las tablas de histórico automáticamente en PostgreSQL
-    app.run(host='127.0.0.1', port=5004, debug=True)
+        
+    debug_mode = os.getenv("FLASK_DEBUG", "True").lower() == "true"
+    app.run(host='127.0.0.1', port=5004, debug=debug_mode)

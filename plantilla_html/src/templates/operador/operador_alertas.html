@@ -1,0 +1,44 @@
+{% extends "base.html" %}
+
+{% block title %}Registro Alertas - Operador AZA{% endblock %}
+
+{% block content %}
+<div class="aza-card">
+  <div class="aza-card-header">
+    <span><i class="fa-solid fa-triangle-exclamation me-2"></i> REGISTRO HISTÓRICO DE ALERTAS (FUERA DE TOLERANCIA)</span>
+    <span class="badge bg-danger">Monitoreo de Desviaciones</span>
+  </div>
+  <div class="aza-card-body">
+    <div class="table-responsive">
+      <table class="table table-hover table-striped align-middle mb-0" style="background-color: #ffffff; border-radius: 6px; overflow: hidden;">
+        <thead class="table-dark">
+          <tr>
+            <th>ID Lectura</th>
+            <th>ID Lote</th>
+            <th>Fecha y Hora</th>
+            <th>Ángulo Medio</th>
+            <th>Estado Tolerancia</th>
+            <th>Evidencia (MongoDB ID)</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for alerta in alertas %}
+          <tr>
+            <td><strong>#{{ alerta.id }}</strong></td>
+            <td>Lote #{{ alerta.lote_id }}</td>
+            <td>{{ alerta.fecha_hora }}</td>
+            <td class="text-danger fw-bold">{{ alerta.angulo_medio }}°</td>
+            <td><span class="badge bg-danger">Fuera de Rango</span></td>
+            <td><code>{{ alerta.id_alm_cap or 'N/A' }}</code></td>
+          </tr>
+          {% else %}
+          <tr>
+            <td colspan="6" class="text-center py-3 text-muted">No hay alertas registradas en el sistema. ¡Todo marcha en orden!</td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+</div>
+{% endblock %}

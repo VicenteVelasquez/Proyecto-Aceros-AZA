@@ -1,0 +1,40 @@
+{% extends "base.html" %}
+
+{% block title %}Resumen Turno - Operador AZA{% endblock %}
+
+{% block content %}
+<div class="row g-3">
+  <div class="col-md-4">
+    <div class="aza-card text-center p-3">
+      <div class="text-muted fw-bold" style="font-size: 0.85rem;">LOTES PROCESADOS</div>
+      <div class="fs-2 fw-bold text-success my-1">{{ total_lotes | default(4) }}</div>
+      <div style="font-size: 0.75rem;">Turno Actual Activo</div>
+    </div>
+  </div>
+  <div class="col-md-4">
+    <div class="aza-card text-center p-3">
+      <div class="text-muted fw-bold" style="font-size: 0.85rem;">LECTURAS CORRECTAS</div>
+      <div class="fs-2 fw-bold text-primary my-1">{{ total_correctas | default(128) }}</div>
+      <div style="font-size: 0.75rem;">Dentro de tolerancia permitida</div>
+    </div>
+  </div>
+  <div class="col-md-4">
+    <div class="aza-card text-center p-3">
+      <div class="text-muted fw-bold" style="font-size: 0.85rem;">ALERTAS DETECTADAS</div>
+      <div class="fs-2 fw-bold text-danger my-1">{{ total_alertas | default(2) }}</div>
+      <div style="font-size: 0.75rem;">Requieren revisión</div>
+    </div>
+  </div>
+</div>
+
+<div class="aza-card mt-3">
+  <div class="aza-card-header">
+    <span><i class="fa-solid fa-chart-line me-2"></i> RESUMEN Y ESTADÍSTICAS DEL TURNO</span>
+  </div>
+  <div class="aza-card-body">
+    <p class="mb-2"><strong>Operador en turno:</strong> {{ session.get('user_nombre', 'Carlos Muñoz') }}</p>
+    <p class="mb-2"><strong>Estado de la línea:</strong> <span class="text-success fw-bold">Operativa / En Línea</span></p>
+    <p class="mb-0 text-muted" style="font-size: 0.85rem;">Los datos son consolidados automáticamente desde el microservicio backend conectado a Supabase.</p>
+  </div>
+</div>
+{% endblock %}

@@ -1,0 +1,56 @@
+{% extends "base.html" %}
+
+{% block title %}Catálogo de Recetas - Operador AZA{% endblock %}
+{% block page_heading %}Catálogo de Recetas y Estándares de Alambrón{% endblock %}
+{% set active_section = 'recetas' %}
+
+{% block content %}
+<div class="row g-4">
+  <div class="col-12">
+    <section class="aza-card">
+      <div class="aza-card-header d-flex justify-content-between align-items-center">
+        <span><i class="fa-solid fa-book-open me-2"></i> ESPECIFICACIONES TÉCNICAS DE FABRICACIÓN (AZA)</span>
+        <span class="badge bg-success">Estándar Oficial Laminado en Caliente</span>
+      </div>
+      <div class="aza-card-body">
+        <p class="text-muted mb-4">
+          Parámetros nominales y tolerancias permitidas para la sección redonda del alambrón (Sección 130x130 mm / Longitud de barra 12 m).
+        </p>
+
+        <div class="table-responsive">
+          <table class="table table-striped table-bordered align-middle mb-0">
+            <thead class="table-dark">
+              <tr>
+                <th>Código de Receta / Grado</th>
+                <th>Calibre Nominal ($e$)</th>
+                <th>Tolerancia Mínima</th>
+                <th>Tolerancia Máxima</th>
+                <th>Estado Operativo</th>
+              </tr>
+            </thead>
+            <tbody>
+              {% for receta in recetas %}
+              <tr>
+                <td><strong>{{ receta.codigo_receta }}</strong></td>
+                <td>{{ receta.calibre_nominal }} mm</td>
+                <td>{{ receta.tolerancia_min }} mm</td>
+                <td>{{ receta.tolerancia_max }} mm</td>
+                <td>
+                  <span class="badge bg-success">Activa en Línea</span>
+                </td>
+              </tr>
+              {% else %}
+              <tr>
+                <td colspan="5" class="text-center text-muted py-4">
+                  No hay recetas configuradas actualmente en el sistema.
+                </td>
+              </tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </section>
+  </div>
+</div>
+{% endblock %}

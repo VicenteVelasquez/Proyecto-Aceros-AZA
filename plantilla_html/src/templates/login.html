@@ -1,0 +1,75 @@
+{% extends "base.html" %}
+{% block title %}Iniciar Sesión - Aceros AZA{% endblock %}
+{% block content %}
+<div class="container d-flex align-items-center justify-content-center" style="min-height: 80vh;">
+  <div class="row justify-content-center w-100">
+    <div class="col-md-5">
+      <div class="aza-card p-4 shadow-sm border-0">
+        
+        <!-- Encabezado de Identidad de Planta -->
+        <div class="text-center mb-4">
+          <div class="text-success mb-2" style="font-size: 2.8rem;">
+            <i class="fa-solid fa-industry"></i>
+          </div>
+          <h3 class="fw-bold text-dark mb-1">Aceros AZA</h3>
+          <p class="text-muted small">Sistema de Monitoreo y Trazabilidad (1660 FPS)</p>
+        </div>
+
+        <!-- Mensajes Flash de Error o Éxito -->
+        {% with messages = get_flashed_messages(with_categories=true) %}
+          {% if messages %}
+            {% for category, message in messages %}
+              <div class="alert alert-{{ 'danger' if category == 'danger' else 'success' if category == 'success' else 'info' }} alert-dismissible fade show small" role="alert">
+                {{ message }}
+                <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+              </div>
+            {% endfor %}
+          {% endif %}
+        {% endwith %}
+
+        {% if error %}
+          <div class="alert alert-danger small" role="alert">
+            <i class="fa-solid fa-triangle-exclamation me-1"></i> {{ error }}
+          </div>
+        {% endif %}
+
+        <!-- Formulario de Inicio de Sesión -->
+        <form method="POST" action="{{ url_for('login_view') }}">
+          <div class="mb-3">
+            <label for="email" class="form-label fw-semibold text-secondary small">Correo Electrónico Corporativo</label>
+            <div class="input-group">
+              <span class="input-group-text bg-light"><i class="fa-solid fa-envelope text-muted"></i></span>
+              <input type="email" class="form-control" id="email" name="email" placeholder="usuario@aza.cl" required autofocus>
+            </div>
+          </div>
+
+          <div class="mb-3">
+            <label for="password" class="form-label fw-semibold text-secondary small">Contraseña</label>
+            <div class="input-group">
+              <span class="input-group-text bg-light"><i class="fa-solid fa-lock text-muted"></i></span>
+              <input type="password" class="form-control" id="password" name="password" placeholder="••••••••" required>
+            </div>
+          </div>
+
+          <button type="submit" class="btn btn-success w-100 py-2 fw-semibold mb-3 shadow-sm">
+            <i class="fa-solid fa-right-to-bracket me-1"></i> Iniciar Sesión en Planta
+          </button>
+
+          <!-- Enlace de Recuperación de Contraseña -->
+          <div class="text-center">
+            <a href="{{ url_for('recuperar_password') }}" class="text-decoration-none small text-muted">
+              <i class="fa-solid fa-key me-1"></i> ¿Olvidó su contraseña?
+            </a>
+          </div>
+        </form>
+
+      </div>
+      
+      <!-- Pie de página institucional -->
+      <div class="text-center mt-3 text-muted small">
+        &copy; 2026 Aceros AZA — Control de Línea de Trefilado Continuo
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}

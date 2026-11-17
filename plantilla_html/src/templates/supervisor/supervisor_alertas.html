@@ -1,0 +1,74 @@
+{% extends "supervisor/base.html" %}
+
+{% block title %}Alertas Activas - Supervisor Aceros AZA{% endblock %}
+{% block page_heading %}Alertas de Calidad{% endblock %}
+{% set active_section = 'alertas' %}
+
+{% block content %}
+<div class="alert alert-warning d-flex align-items-center gap-2 mb-3" role="note">
+  <i class="fa-solid fa-flask" aria-hidden="true"></i>
+  <span><strong>Modo supervisor:</strong> monitoreo en tiempo real conectado al registro histórico de Supabase.</span>
+</div>
+
+<section class="aza-card mb-4">
+  <div class="aza-card-header">
+    <span><i class="fa-solid fa-bell me-2"></i> ALERTAS RECIENTES</span>
+    <span class="badge bg-danger">{{ dashboard.recent_alerts|length }}</span>
+  </div>
+  <div class="aza-card-body">
+    <div class="table-responsive">
+      <table class="table table-sm table-striped align-middle mb-0">
+        <thead>
+          <tr>
+            <th>Fecha</th>
+            <th>Lote</th>
+            <th>Receta</th>
+            <th>Ángulo medido</th>
+            <th>Límite</th>
+            <th>Desviación</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for alert in dashboard.recent_alerts %}
+          <tr>
+            <td>{{ alert.date }}</td>
+            <td>{{ alert.lot }}</td>
+            <td>{{ alert.recipe }}</td>
+            <td>{{ alert.angle }}°</td>
+            <td>{{ alert.limit }}°</td>
+            <td class="text-danger fw-bold">
+              {% if alert.angle is number and alert.limit is number %}
+                {{ (alert.angle - alert.limit)|abs|round(1) }}°
+              {% else %}
+                0.0°
+              {% endif %}
+            </td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+</section>
+
+<section class="aza-card">
+  <div class="aza-card-header">
+    <span><i class="fa-solid fa-chart-column me-2"></i> ALERTAS POR DÍA</span>
+  </div>
+  <div class="aza-card-body">
+    {% for day in dashboard.alerts_by_day %}
+    <div class="d-flex align-items-center gap-2 mb-2">
+      <span class="small text-nowrap" style="width: 58px;">{{ day.day }}</span>
+      <div class="progress flex-grow-1" role="progressbar" aria-label="Alertas del {{ day.day }}" aria-valuenow="{{ day.count }}" aria-valuemin="0" aria-valuemax="34">
+        <!-- Usamos un atributo data-width para evitar el falso positivo del linter de CSS -->
+        <div class="progress-bar bg-danger barra-dinamica" data-width="{{ day.bar_width }}"></div>
+      </div>
+      <strong class="small text-end" style="width: 32px;">{{ day.count }}</strong>
+    </div>
+    {% endfor %}
+  </div>
+</section>
+
+{% block extra_js %}
+<script src="{{ url_for('static', filename='js/supervisor.js') }}"></script>
+{% endblock %}

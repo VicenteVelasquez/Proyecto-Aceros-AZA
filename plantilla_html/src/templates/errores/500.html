@@ -1,0 +1,14 @@
+{% extends "base.html" %}
+{% block title %}Error de Servidor - AZA{% endblock %}
+{% block content %}
+<div class="container text-center py-5">
+  <div class="row justify-content-center">
+    <div class="col-md-6 aza-card p-5 shadow-sm">
+      <div class="text-danger mb-3" style="font-size: 3.5rem;"><i class="fa-solid fa-server"></i></div>
+      <h2 class="fw-bold text-dark mb-2">Error Interno del Servidor (500)</h2>
+      <p class="text-muted mb-4">Se ha producido un inconveniente procesando la solicitud en la base de datos o servicios de planta.</p>
+      <a href="{{ url_for('home') }}" class="btn btn-success btn-sm px-4">Reintentar Conexión</a>
+    </div>
+  </div>
+</div>
+{% endblock %}

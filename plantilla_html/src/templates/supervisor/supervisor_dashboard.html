@@ -1,0 +1,111 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="alert alert-warning d-flex align-items-center gap-2 mb-0" role="note">
+  <i class="fa-solid fa-flask" aria-hidden="true"></i>
+  <span><strong>Modo demostración:</strong> estos indicadores son ficticios y no representan datos consultados de Supabase ni de los microservicios.</span>
+</div>
+
+<div class="d-flex align-items-center justify-content-between flex-wrap gap-2">
+  <h2 class="h4 mb-0">Resumen de planta</h2>
+  <span class="badge bg-light text-dark">{{ dashboard.period }}</span>
+</div>
+
+<div class="row g-3">
+  <div class="col-sm-6 col-xl-3">
+    <section class="aza-card h-100"><div class="aza-card-body">
+      <div class="text-muted small">Lotes activos</div>
+      <div class="fs-2 fw-bold text-primary">{{ dashboard.summary.active_lots }}</div>
+      <a href="{{ url_for('supervisor_lotes') }}" class="small">Revisar lotes</a>
+    </div></section>
+  </div>
+  <div class="col-sm-6 col-xl-3">
+    <section class="aza-card h-100"><div class="aza-card-body">
+      <div class="text-muted small">Lecturas analizadas</div>
+      <div class="fs-2 fw-bold text-dark">{{ "{:,}".format(dashboard.summary.readings) }}</div>
+      <div class="small text-muted">Datos simulados del período</div>
+    </div></section>
+  </div>
+  <div class="col-sm-6 col-xl-3">
+    <section class="aza-card h-100"><div class="aza-card-body">
+      <div class="text-muted small">Dentro de tolerancia</div>
+      <div class="fs-2 fw-bold text-success">{{ dashboard.summary.within_tolerance }}%</div>
+      <div class="progress" role="progressbar" aria-label="Lecturas dentro de tolerancia" aria-valuenow="{{ dashboard.summary.within_tolerance }}" aria-valuemin="0" aria-valuemax="100">
+        <div class="progress-bar bg-success barra-dinamica" data-width="{{ dashboard.summary.within_tolerance }}"></div>
+      </div>
+    </div></section>
+  </div>
+  <div class="col-sm-6 col-xl-3">
+    <section class="aza-card h-100"><div class="aza-card-body">
+      <div class="text-muted small">Alertas de calidad</div>
+      <div class="fs-2 fw-bold text-danger">{{ dashboard.summary.alerts }}</div>
+      <a href="{{ url_for('supervisor_alertas') }}" class="small">Ver alertas recientes</a>
+    </div></section>
+  </div>
+</div>
+
+<div class="row g-3">
+  <div class="col-lg-7">
+    <section class="aza-card h-100">
+      <div class="aza-card-header"><span><i class="fa-solid fa-chart-column me-2"></i> PRODUCCIÓN DIARIA</span></div>
+      <div class="aza-card-body">
+        <p class="text-muted small">Lotes registrados por día (datos de demostración).</p>
+        {% for day in dashboard.production_by_day %}
+        <div class="d-flex align-items-center gap-2 mb-2">
+          <span class="small text-nowrap" style="width: 58px;">{{ day.day }}</span>
+          <div class="progress flex-grow-1" role="progressbar" aria-label="Lotes del {{ day.day }}" aria-valuenow="{{ day.count }}" aria-valuemin="0" aria-valuemax="31">
+            <div class="progress-bar bg-success barra-dinamica" data-width="{{ day.bar_width }}"></div>
+          </div>
+          <strong class="small text-end" style="width: 32px;">{{ day.count }}</strong>
+        </div>
+        {% endfor %}
+      </div>
+    </section>
+  </div>
+  <div class="col-lg-5">
+    <section class="aza-card h-100">
+      <div class="aza-card-header"><span><i class="fa-solid fa-gauge-high me-2"></i> TENDENCIA DE CALIDAD</span></div>
+      <div class="aza-card-body">
+        <p class="text-muted small">Lecturas dentro de tolerancia (datos de demostración).</p>
+        {% for day in dashboard.quality_by_day %}
+        <div class="d-flex align-items-center gap-2 mb-2">
+          <span class="small text-nowrap" style="width: 58px;">{{ day.day }}</span>
+          <div class="progress flex-grow-1" role="progressbar" aria-label="Calidad del {{ day.day }}" aria-valuenow="{{ day.percentage }}" aria-valuemin="0" aria-valuemax="100">
+            <div class="progress-bar {% if day.percentage >= 98 %}bg-success{% else %}bg-warning{% endif %} barra-dinamica" data-width="{{ day.percentage }}"></div>
+          </div>
+          <strong class="small text-end" style="width: 48px;">{{ day.percentage }}%</strong>
+        </div>
+        {% endfor %}
+      </div>
+    </section>
+  </div>
+</div>
+
+<section class="aza-card">
+  <div class="aza-card-header">
+    <span><i class="fa-solid fa-clipboard-list me-2"></i> LOTES RECIENTES</span>
+    <a class="btn btn-sm btn-outline-light" href="{{ url_for('supervisor_lotes') }}">Consultar lotes</a>
+  </div>
+  <div class="aza-card-body">
+    <div class="table-responsive">
+      <table class="table table-sm table-striped align-middle mb-0">
+        <thead><tr><th>Lote</th><th>Fecha</th><th>Receta</th><th>Estado</th></tr></thead>
+        <tbody>
+          {% for lot in lots %}
+          <tr>
+            <td>{{ lot.code }}</td>
+            <td>{{ lot.date_label }}</td>
+            <td>{{ lot.recipe }}</td>
+            <td><span class="badge {{ lot.style }}">{{ lot.status }}</span></td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+</section>
+
+<!-- Script global para asignar anchos de barras de progreso de forma limpia -->
+{% block extra_js %}
+<script src="{{ url_for('static', filename='js/supervisor.js') }}"></script>
+{% endblock %}

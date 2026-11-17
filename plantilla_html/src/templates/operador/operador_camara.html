@@ -1,0 +1,215 @@
+{% extends "base.html" %}
+
+{% block title %}Registro de Ciclo - Operador AZA{% endblock %}
+
+{% block extra_css %}
+<style>
+  /* Hace que la barra superior y encabezados acompañen el scroll en todas partes */
+  .sticky-top-bar {
+    position: sticky;
+    top: 0;
+    z-index: 1020;
+    background-color: #0f2d1e;
+  }
+  .metrics-strip {
+    display: flex;
+    justify-content: space-between;
+    background-color: #d3e8be;
+    padding: 8px 14px;
+    border-radius: 6px;
+    font-weight: 600;
+    font-size: 0.85rem;
+    margin-bottom: 12px;
+    flex-wrap: wrap;
+    gap: 8px;
+    color: #0f2d1e;
+  }
+  .m2m-display-large {
+    background-color: #05160c;
+    border: 2px solid #2e6b40;
+    border-radius: 10px;
+    padding: 20px;
+    color: #ffffff;
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+    box-shadow: 0 4px 15px rgba(0, 0, 0, 0.3);
+  }
+  .camera-box-large {
+    background: linear-gradient(135deg, #0a1d13, #0f2d1e);
+    border: 2px dashed #3a7a4f;
+    border-radius: 8px;
+    min-height: 320px;
+    width: 100%;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    color: #dfeee3;
+    text-align: center;
+    padding: 20px;
+    box-shadow: inset 0 0 30px rgba(94, 153, 111, 0.15);
+  }
+  .camera-box-large i {
+    font-size: 3.5rem;
+    margin-bottom: 12px;
+    color: #a5d6a7;
+  }
+  .camera-box-large span {
+    font-size: 0.9rem;
+    font-family: Consolas, monospace;
+    color: #dfeee3;
+    letter-spacing: 0.5px;
+  }
+</style>
+{% endblock %}
+
+{% block content %}
+<!-- Mensaje flash de notificación -->
+{% with messages = get_flashed_messages(with_categories=true) %}
+  {% if messages %}
+    {% for category, message in messages %}
+      <div class="alert alert-{{ 'success' if category == 'success' else 'danger' }} alert-dismissible fade show shadow-sm" role="alert">
+        <i class="fa-solid {{ 'fa-circle-check' if category == 'success' else 'fa-triangle-exclamation' }} me-2"></i>
+        {{ message }}
+        <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Cerrar"></button>
+      </div>
+    {% endfor %}
+  {% endif %}
+{% endwith %}
+
+<div class="row g-4">
+  <!-- Columna Izquierda: Cámara Grande y Estética (1660 FPS) movida a la izquierda -->
+  <div class="col-lg-7">
+    <div class="aza-card h-100 shadow-sm">
+      <div class="aza-card-header d-flex justify-content-between align-items-center">
+        <span><i class="fa-solid fa-video me-2"></i> CAPTURA CLAVE DE ALTA VELOCIDAD (1660 FPS)</span>
+        <span class="badge bg-success"><i class="fa-solid fa-circle-check me-1"></i> Línea Continua Activa</span>
+      </div>
+      <div class="aza-card-body d-flex flex-column justify-content-between">
+        
+        <!-- Tira de métricas dinámicas -->
+        <div class="metrics-strip">
+          <span>Calibre: <strong id="metric-nominal">5.5 mm</strong></span>
+          <span>Tolerancia: <strong><span id="metric-tol-min">5.3</span> / <span id="metric-tol-max">5.7</span> mm</strong></span>
+          <span>Estado: <strong class="text-success">ACTIVO</strong></span>
+          <span>Batch: <strong id="metric-batch">BATCH 01</strong></span>
+        </div>
+
+        <!-- Visor M2M de gran tamaño -->
+        <div class="m2m-display-large">
+          <div class="camera-box-large" id="camera-box">
+            <i class="fa-solid fa-camera" id="camera-icon"></i>
+            <span id="camera-text">VISOR DE CÁMARA 1660 FPS EN VIVO<br><small style="color: #a5d6a7;">Evaluación de ángulo y caída (12m / 130x130mm)</small></span>
+          </div>
+
+          <div class="d-flex justify-content-between align-items-center border-top border-success border-opacity-25 pt-3">
+            <div>
+              <div style="font-size: 0.78rem; color: #a5d6a7; text-transform: uppercase;">Ángulo Registrado</div>
+              <div class="fs-2 fw-bold text-success" id="measured-angle">180.0°</div>
+            </div>
+            <div class="text-end">
+              <span class="badge bg-success mb-1" id="tolerance-badge">Monitoreo Óptimo</span>
+              <div style="font-size: 0.75rem; color: #bdc1c6;">Desviación: <span id="angle-deviation">+0.0°</span></div>
+            </div>
+          </div>
+        </div>
+
+      </div>
+    </div>
+  </div>
+
+  <!-- Columna Derecha: Paneles apilados (Batch y Observaciones) -->
+  <div class="col-lg-5">
+    <div class="d-flex flex-column gap-4">
+      
+      <!-- Panel 1: Gestión de Batch y Velocidad -->
+      <div class="aza-card shadow-sm">
+        <div class="aza-card-header">
+          <span><i class="fa-solid fa-industry me-2"></i> GESTIÓN DE BATCH Y VELOCIDAD</span>
+          <span class="badge bg-warning text-dark">Control Planta</span>
+        </div>
+        <div class="aza-card-body">
+          <form action="{{ url_for('api_registrar_captura') }}" method="POST" id="form-iniciar-batch">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+            <input type="hidden" name="lote_id" value="1">
+            <input type="hidden" name="angulo_medio" value="180.0">
+            <input type="hidden" name="foto_url" value="captura_en_vivo">
+            
+            <div class="row g-2 mb-3">
+              <div class="col-6">
+                <label class="form-label fw-bold mb-1" style="font-size: 0.8rem;">Batch Actual:</label>
+                <input id="batch-actual-input" type="text" class="form-control form-control-sm fw-bold bg-light" value="LOT-AZA-2026 / BATCH 01" readonly>
+              </div>
+              <div class="col-6">
+                <label class="form-label fw-bold mb-1" style="font-size: 0.8rem;">Turno Asignado:</label>
+                <input id="turno-asignado" type="text" name="turno" class="form-control form-control-sm bg-light" value="{{ turno_actual }}" readonly>
+              </div>
+            </div>
+
+            <div class="mb-3">
+              <label class="form-label fw-bold mb-1" style="font-size: 0.8rem;">Seleccione Receta de Alambrón:</label>
+              <select class="form-select form-select-sm fw-semibold" id="select-receta-activa" name="receta_id">
+                {% for receta in recetas %}
+                  <option value="{{ receta.id }}" 
+                          data-codigo="{{ receta.codigo_receta }}"
+                          data-nominal="{{ receta.calibre_nominal }}" 
+                          data-min="{{ receta.tolerancia_min }}" 
+                          data-max="{{ receta.tolerancia_max }}">
+                    {{ receta.codigo_receta }} — Calibre: {{ receta.calibre_nominal }} mm (Min: {{ receta.tolerancia_min }} / Max: {{ receta.tolerancia_max }})
+                  </option>
+                {% else %}
+                  <option value="" disabled selected>No hay recetas cargadas</option>
+                {% endfor %}
+              </select>
+            </div>
+
+            <div class="d-grid">
+              <button type="submit" class="btn btn-success btn-sm py-2" id="btn-iniciar">
+                <i class="fa-solid fa-play me-1"></i> INICIAR / REGISTRAR BATCH
+              </button>
+            </div>
+          </form>
+
+          <hr class="my-3">
+          <!-- Controles directos de velocidad -->
+          <form action="{{ url_for('api_control_velocidad') }}" method="POST" class="d-flex gap-2">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+            <input type="hidden" name="lote_id" value="1">
+            <button type="submit" name="accion" value="acelerar" class="btn btn-success btn-sm flex-grow-1">
+              <i class="fa-solid fa-gauge-high me-1"></i> Acelerar
+            </button>
+            <button type="submit" name="accion" value="ralentizar" class="btn btn-warning text-dark btn-sm flex-grow-1">
+              <i class="fa-solid fa-gauge-simple-low me-1"></i> Ralentizar
+            </button>
+          </form>
+        </div>
+      </div>
+
+      <!-- Panel 2: Observación del Producto y Ciclo -->
+      <div class="aza-card shadow-sm">
+        <div class="aza-card-header">
+          <span><i class="fa-solid fa-clipboard-check me-2"></i> OBSERVACIÓN DEL PRODUCTO Y CICLO</span>
+        </div>
+        <div class="aza-card-body">
+          <div class="mb-2" style="font-size: 0.8rem;">
+            <strong>Evento:</strong> <span id="observation-event">Monitoreo activo</span> | Ángulo: <strong id="observation-angle">180.0°</strong>
+          </div>
+          <div class="mb-3">
+            <label class="form-label fw-bold mb-1" style="font-size: 0.8rem;">Comentarios / Notas del Operador:</label>
+            <textarea class="form-control form-control-sm" id="input-observacion" rows="3" placeholder="Ingrese notas sobre el comportamiento del alambrón..."></textarea>
+          </div>
+          <button class="btn btn-success btn-sm w-100" id="btn-guardar">
+            <i class="fa-solid fa-floppy-disk me-1"></i> Guardar Observación
+          </button>
+        </div>
+      </div>
+
+    </div>
+  </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script src="{{ url_for('static', filename='js/operador_camara.js') }}"></script>
+{% endblock %}

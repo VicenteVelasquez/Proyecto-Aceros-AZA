@@ -1,0 +1,245 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <title>{% block title %}Plataforma - AZA{% endblock %}</title>
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
+  <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.2/css/all.min.css" rel="stylesheet">
+  <style>
+    body {
+      background-color: #072212;
+      font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+      margin: 0;
+      padding: 0;
+      color: #ffffff;
+    }
+
+    /* Topbar AZA */
+    .aza-topbar {
+      position: sticky;
+      top: 0;
+      z-index: 1000;
+      background-color: #0d3b20;
+      color: #ffffff;
+      padding: 12px 24px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      border-bottom: 2px solid #235c38;
+      box-shadow: 0 4px 10px rgba(0,0,0,0.3);
+    }
+    .brand-box {
+      display: flex;
+      align-items: center;
+      gap: 15px;
+    }
+    .logo-badge {
+      padding: 4px 0px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+    .logo-badge img {
+      height: 48px;
+      width: auto;
+      display: block;
+    }
+    .topbar-title {
+      font-size: 1.35rem;
+      font-weight: 600;
+      border-left: 2px solid #4a8c5f;
+      padding-left: 15px;
+      margin: 0;
+    }
+    .user-session {
+      display: flex;
+      align-items: center;
+      gap: 18px;
+      font-size: 0.9rem;
+      color: #c8e6c9;
+    }
+    .logout-btn {
+      color: #a5d6a7;
+      text-decoration: none;
+      font-weight: 600;
+    }
+    .logout-btn:hover { color: #ffffff; }
+
+    /* Layout Principal */
+    .app-body {
+      display: flex;
+      background-color: #072212;
+      min-height: calc(100vh - 75px);
+    }
+
+    /* Sidebar */
+    .aza-sidebar {
+      width: 160px;
+      background-color: #0b321b;
+      border-right: 1px solid #1e5231;
+      display: flex;
+      flex-direction: column;
+      padding-top: 15px;
+      flex-shrink: 0;
+    }
+    .nav-item-aza {
+      padding: 14px 10px;
+      text-align: center;
+      color: #81c784;
+      font-size: 0.82rem;
+      font-weight: 500;
+      border-left: 4px solid transparent;
+      text-decoration: none;
+      display: block;
+    }
+    .nav-item-aza.active, .nav-item-aza:hover {
+      background-color: #144929;
+      color: #ffffff;
+      border-left: 4px solid #7cb342;
+      font-weight: 700;
+    }
+    .nav-item-aza i {
+      display: block;
+      font-size: 1.3rem;
+      margin-bottom: 5px;
+    }
+
+    /* Contenido General */
+    .main-panel {
+      flex: 1;
+      padding: 18px 22px;
+      display: flex;
+      flex-direction: column;
+      gap: 16px;
+    }
+
+    /* Tarjetas estilo AZA */
+    .aza-card {
+      background-color: #e6f2d9;
+      border-radius: 10px;
+      overflow: hidden;
+      box-shadow: 0 6px 15px rgba(0,0,0,0.4);
+    }
+    .aza-card-header {
+      background-color: #144929;
+      color: #ffffff;
+      font-weight: 700;
+      font-size: 0.92rem;
+      padding: 8px 18px;
+      letter-spacing: 0.5px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+    .aza-card-body {
+      padding: 14px 18px;
+      color: #092c17;
+    }
+  </style>
+  {% block extra_css %}{% endblock %}
+</head>
+<body>
+
+  {# Verificamos si estamos en una página pública o sin sesión activa #}
+  {% set es_publico = request.path in ['/', '/login', '/recuperar-password'] or request.path.startswith('/reset-password') or not session.get('user_id') %}
+
+  <!-- Topbar Dinámico (Se oculta limpiamente si es público) -->
+  {% if not es_publico %}
+  <div class="aza-topbar">
+    <div class="brand-box">
+      <div class="logo-badge">
+        <img src="{{ url_for('static', filename='img/logo_aza.png') }}" alt="Logo AZA" onerror="this.style.display='none'">
+      </div>
+      <h1 class="topbar-title">
+        {% set rol = session.get('user_role', 'Operador') | lower %}
+        {% if 'admin' in rol %}
+          Panel de Administración (Aceros AZA)
+        {% elif 'supervis' in rol %}
+          Panel de Supervisión (Aceros AZA)
+        {% else %}
+          Terminal de Operador (Planta)
+        {% endif %}
+      </h1>
+    </div>
+    <div class="user-session">
+      <span>
+        <i class="fa-solid fa-user-gear me-1"></i> 
+        {{ session.get('user_role', 'Operador') }}: <strong>{{ session.get('user_nombre', session.get('user_email', 'Usuario')) }}</strong>
+      </span>
+      <a href="{{ url_for('logout') }}" class="logout-btn"><i class="fa-solid fa-right-from-bracket me-1"></i> Cerrar Sesión</a>
+    </div>
+  </div>
+  {% endif %}
+
+  <!-- Estructura Condicional Global para Login / Paneles Internos -->
+  {% if es_publico %}
+    <main class="w-100">
+      {% block content %}{% endblock %}
+    </main>
+  {% else %}
+    <div class="app-body">
+      <!-- Menú Lateral Dinámico según Rol -->
+      <div class="aza-sidebar">
+        {% set rol = session.get('user_role', 'Operador') | lower %}
+        
+        {% if 'admin' in rol %}
+          <!-- MENÚ ADMINISTRADOR -->
+          <a href="{{ url_for('admin_dashboard') }}" class="nav-item-aza {% if request.path == '/admin' or request.path == '/admin/dashboard' %}active{% endif %}">
+            <i class="fa-solid fa-chart-pie"></i> Dashboard
+          </a>
+          <a href="{{ url_for('admin_recetas_list') }}" class="nav-item-aza {% if 'recetas' in request.path %}active{% endif %}">
+            <i class="fa-solid fa-book-medical"></i> Recetas
+          </a>
+          <a href="{{ url_for('admin_usuarios_list') }}" class="nav-item-aza {% if 'usuarios' in request.path %}active{% endif %}">
+            <i class="fa-solid fa-users-gear"></i> Usuarios
+          </a>
+          <a href="{{ url_for('admin_produccion_list') }}" class="nav-item-aza {% if 'produccion' in request.path %}active{% endif %}">
+            <i class="fa-solid fa-industry"></i> Producción
+          </a>
+          <a href="{{ url_for('admin_reportes_list') }}" class="nav-item-aza {% if 'reportes' in request.path %}active{% endif %}">
+            <i class="fa-solid fa-file-lines"></i> Reportes
+          </a>
+
+        {% elif 'supervis' in rol %}
+          <!-- MENÚ SUPERVISOR -->
+          <a href="{{ url_for('supervisor_dashboard') }}" class="nav-item-aza {% if 'dashboard' in request.path or request.path == '/supervisor' %}active{% endif %}">
+            <i class="fa-solid fa-chart-pie"></i> Dashboard
+          </a>
+          <a href="{{ url_for('supervisor_alertas') }}" class="nav-item-aza {% if 'alertas' in request.path %}active{% endif %}">
+            <i class="fa-solid fa-triangle-exclamation"></i> Alertas
+          </a>
+          <a href="{{ url_for('supervisor_lotes') }}" class="nav-item-aza {% if 'lotes' in request.path %}active{% endif %}">
+            <i class="fa-solid fa-boxes-stacked"></i> Lotes
+          </a>
+          <a href="{{ url_for('supervisor_reportes') }}" class="nav-item-aza {% if 'reportes' in request.path %}active{% endif %}">
+            <i class="fa-solid fa-file-excel"></i> Reportes
+          </a>
+
+        {% else %}
+          <!-- MENÚ OPERADOR -->
+          <a href="{{ url_for('operador_camara') }}" class="nav-item-aza {% if request.endpoint == 'operador_camara' %}active{% endif %}">
+            <i class="fa-solid fa-camera"></i> Cámara
+          </a>
+          <a href="{{ url_for('operador_recetas') }}" class="nav-item-aza {% if request.endpoint == 'operador_recetas' %}active{% endif %}">
+            <i class="fa-solid fa-book-open"></i> Catálogo Recetas
+          </a>
+          <a href="{{ url_for('operador_alertas') }}" class="nav-item-aza {% if request.endpoint == 'operador_alertas' %}active{% endif %}">
+            <i class="fa-solid fa-triangle-exclamation"></i> Registro Alertas
+          </a>
+          <a href="{{ url_for('operador_resumen') }}" class="nav-item-aza {% if request.endpoint == 'operador_resumen' %}active{% endif %}">
+            <i class="fa-solid fa-chart-line"></i> Resumen Turno
+          </a>
+        {% endif %}
+      </div>
+
+      <!-- Panel Principal que inyecta de forma segura el contenido -->
+      <div class="main-panel">
+        {{ self.content() }}
+      </div>
+    </div>
+  {% endif %}
+
+  <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
+  {% block extra_js %}{% endblock %}
+</body>
+</html>

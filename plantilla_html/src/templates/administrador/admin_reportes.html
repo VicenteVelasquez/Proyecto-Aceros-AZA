@@ -1,0 +1,91 @@
+{% extends "base.html" %}
+
+{% block title %}Reportes - Administración Aceros AZA{% endblock %}
+{% block page_heading %}Reportes de Administración{% endblock %}
+{% set active_section = 'reportes' %}
+
+{% block content %}
+<div class="alert alert-warning d-flex align-items-center gap-2 mb-0" role="note">
+  <i class="fa-solid fa-flask" aria-hidden="true"></i>
+  <span><strong>Modo demostración:</strong> las descargas usan los mismos datos ficticios del dashboard.</span>
+</div>
+
+<section class="aza-card">
+  <div class="aza-card-header">
+    <span><i class="fa-solid fa-file-export me-2"></i> GENERAR REPORTE</span>
+  </div>
+  <div class="aza-card-body">
+    <p>Selecciona el contenido y el formato. Cada archivo incluye las tablas y métricas disponibles para el período indicado.</p>
+    <form action="{{ url_for('admin_reportes_descargar') }}" method="get" class="row g-3 align-items-end">
+      <div class="col-lg-5">
+        <label class="form-label fw-bold" for="tipo-reporte">Contenido del reporte</label>
+        <select class="form-select" id="tipo-reporte" name="tipo" required>
+          {% for key, label in report_types.items() %}
+          <option value="{{ key }}">{{ label }}</option>
+          {% endfor %}
+        </select>
+      </div>
+      <div class="col-lg-4">
+        <label class="form-label fw-bold" for="formato-reporte">Formato de archivo</label>
+        <select class="form-select" id="formato-reporte" name="formato" required>
+          <option value="excel">Excel (.xlsx)</option>
+          <option value="pdf">PDF (.pdf)</option>
+          <option value="word">Word (.docx)</option>
+        </select>
+      </div>
+      <div class="col-lg-3">
+        <button type="submit" class="btn btn-success w-100">
+          <i class="fa-solid fa-download me-1"></i> Descargar reporte
+        </button>
+      </div>
+    </form>
+  </div>
+</section>
+
+<div class="row g-3">
+  <div class="col-md-6">
+    <section class="aza-card h-100">
+      <div class="aza-card-header"><span>Reporte general</span></div>
+      <div class="aza-card-body">
+        <p>Incluye indicadores generales, lotes por estado, tendencias de producción y calidad, desempeño de recetas y alertas.</p>
+        <span class="badge bg-success">Producción + Calidad + Lotes</span>
+      </div>
+    </section>
+  </div>
+  <div class="col-md-6">
+    <section class="aza-card h-100">
+      <div class="aza-card-header"><span>Reporte de producción</span></div>
+      <div class="aza-card-body">
+        <p>Resume lotes del período, distribución por estado, producción diaria y lotes que requieren revisión.</p>
+        <span class="badge bg-primary">Producción y trazabilidad</span>
+      </div>
+    </section>
+  </div>
+  <div class="col-md-6">
+    <section class="aza-card h-100">
+      <div class="aza-card-header"><span>Reporte de calidad</span></div>
+      <div class="aza-card-body">
+        <p>Presenta lecturas dentro de tolerancia, tendencia de alertas, ranking de recetas y desviaciones recientes.</p>
+        <span class="badge bg-warning text-dark">Calidad y recetas</span>
+      </div>
+    </section>
+  </div>
+  <div class="col-md-6">
+    <section class="aza-card h-100">
+      <div class="aza-card-header"><span>Reporte de lotes</span></div>
+      <div class="aza-card-body">
+        <p>Lista los estados de lotes, los últimos registros y los lotes con mayor cantidad de alertas.</p>
+        <span class="badge bg-secondary">Lotes y alertas</span>
+      </div>
+    </section>
+  </div>
+</div>
+
+<section class="aza-card">
+  <div class="aza-card-body">
+    <h2 class="h5">Período y origen de datos</h2>
+    <p class="mb-1"><strong>Período disponible:</strong> Últimos 7 días.</p>
+    <p class="mb-0">Los archivos Excel, PDF y Word se generan en el servidor. El dashboard actual aún usa datos ficticios; cuando se conecten los servicios, estos reportes podrán usar métricas reales sin cambiar los formatos.</p>
+  </div>
+</section>
+{% endblock %}

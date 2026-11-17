@@ -1,0 +1,51 @@
+{% extends "base.html" %}
+
+{% block title %}Lotes y Fechas - Supervisor Aceros AZA{% endblock %}
+{% block page_heading %}Lotes y Fechas{% endblock %}
+{% set active_section = 'lotes' %}
+
+{% block content %}
+<div class="alert alert-warning d-flex align-items-center gap-2 mb-0" role="note">
+  <i class="fa-solid fa-flask" aria-hidden="true"></i>
+  <span><strong>Modo demostración:</strong> los lotes y sus fechas son ficticios; no corresponden a una auditoría de producción real.</span>
+</div>
+<section class="aza-card">
+  <div class="aza-card-header"><span><i class="fa-solid fa-filter me-2"></i> CONSULTA DE LOTES</span></div>
+  <div class="aza-card-body">
+    <form method="get" action="{{ url_for('supervisor_lotes') }}" class="row g-3 align-items-end">
+      <div class="col-md-5">
+        <label for="lote" class="form-label fw-bold">Código de lote</label>
+        <input id="lote" name="lote" type="search" class="form-control" value="{{ lot_query }}" placeholder="Ej.: LOT-2026-891">
+      </div>
+      <div class="col-md-4">
+        <label for="fecha" class="form-label fw-bold">Fecha</label>
+        <input id="fecha" name="fecha" type="date" class="form-control" value="{{ selected_date }}">
+      </div>
+      <div class="col-md-3 d-flex gap-2">
+        <button type="submit" class="btn btn-success flex-grow-1"><i class="fa-solid fa-magnifying-glass me-1"></i> Consultar</button>
+        <a href="{{ url_for('supervisor_lotes') }}" class="btn btn-outline-secondary">Limpiar</a>
+      </div>
+    </form>
+  </div>
+</section>
+
+<section class="aza-card">
+  <div class="aza-card-header"><span>RESULTADOS ({{ lots|length }})</span></div>
+  <div class="aza-card-body">
+    {% if lots %}
+    <div class="table-responsive">
+      <table class="table table-sm table-striped align-middle mb-0">
+        <thead><tr><th>Fecha</th><th>Lote</th><th>Receta</th><th>Estado</th></tr></thead>
+        <tbody>
+          {% for lot in lots %}
+          <tr><td>{{ lot.date_label }}</td><td>{{ lot.code }}</td><td>{{ lot.recipe }}</td><td><span class="badge {{ lot.style }}">{{ lot.status }}</span></td></tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+    {% else %}
+    <p class="mb-0 text-muted">No hay lotes que coincidan con los filtros seleccionados.</p>
+    {% endif %}
+  </div>
+</section>
+{% endblock %}

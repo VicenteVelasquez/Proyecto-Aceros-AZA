@@ -1,0 +1,114 @@
+{% extends "base.html" %}
+
+{% block title %}Dashboard Administrador - Aceros AZA{% endblock %}
+
+{% block content %}
+<div class="container-fluid p-0">
+  <!-- Fila de Bienvenida y Métricas Principales -->
+  <div class="row mb-4">
+    <div class="col-12">
+      <div class="aza-card p-4">
+        <h2 class="text-success fw-bold mb-2">
+          <i class="fa-solid fa-gauge-high me-2"></i> Panel de Control General
+        </h2>
+        <p class="text-muted mb-0">
+          Bienvenido al sistema de trazabilidad y monitoreo industrial de Aceros AZA. Visualice el estado de los lotes, operadores activos y registros de calidad en tiempo real.
+        </p>
+      </div>
+    </div>
+  </div>
+
+  <!-- Tarjetas de Estadísticas Rápidas -->
+  <div class="row g-4 mb-4">
+    <!-- Tarjeta 1 -->
+    <div class="col-md-3">
+      <div class="aza-card h-100">
+        <div class="aza-card-header">
+          <span>Lotes Procesados</span>
+          <i class="fa-solid fa-boxes-stacked"></i>
+        </div>
+        <div class="aza-card-body text-center">
+          <h3 class="fw-bold text-success mb-1">1,248</h3>
+          <span class="text-muted small">Turno actual en curso</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- Tarjeta 2 -->
+    <div class="col-md-3">
+      <div class="aza-card h-100">
+        <div class="aza-card-header">
+          <span>Índice de Calidad</span>
+          <i class="fa-solid fa-circle-check"></i>
+        </div>
+        <div class="aza-card-body text-center">
+          <h3 class="fw-bold text-success mb-1">98.4%</h3>
+          <span class="text-muted small">Dentro de tolerancia</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- Tarjeta 3 -->
+    <div class="col-md-3">
+      <div class="aza-card h-100">
+        <div class="aza-card-header">
+          <span>Alertas Activas</span>
+          <i class="fa-solid fa-triangle-exclamation text-warning"></i>
+        </div>
+        <div class="aza-card-body text-center">
+          <h3 class="fw-bold text-danger mb-1">2</h3>
+          <span class="text-muted small">Requieren revisión</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- Tarjeta 4 -->
+    <div class="col-md-3">
+      <div class="aza-card h-100">
+        <div class="aza-card-header">
+          <span>Operadores en Línea</span>
+          <i class="fa-solid fa-users"></i>
+        </div>
+        <div class="aza-card-body text-center">
+          <h3 class="fw-bold text-success mb-1">14</h3>
+          <span class="text-muted small">Conectados a planta</span>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Sección de Accesos Rápidos de Administración -->
+  <div class="row">
+    <div class="col-12">
+      <div class="aza-card">
+        <div class="aza-card-header">
+          <span>Gestión del Sistema</span>
+          <i class="fa-solid fa-gears"></i>
+        </div>
+        <div class="aza-card-body">
+          <div class="row g-3">
+            <div class="col-md-4">
+              <a href="{{ url_for('admin_recetas_list') }}" class="btn btn-outline-success w-100 py-3 text-start">
+                <i class="fa-solid fa-book-medical fa-lg me-2"></i> <strong>Administrar Recetas</strong>
+                <br><small class="text-muted">Parámetros y tolerancias de laminación</small>
+              </a>
+            </div>
+            <div class="col-md-4">
+              <a href="{{ url_for('admin_usuarios_list') }}" class="btn btn-outline-success w-100 py-3 text-start">
+                <i class="fa-solid fa-users-gear fa-lg me-2"></i> <strong>Control de Usuarios</strong>
+                <br><small class="text-muted">Roles, accesos y credenciales</small>
+              </a>
+            </div>
+            <div class="col-md-4">
+              <a href="{{ url_for('admin_reportes_list') }}" class="btn btn-outline-success w-100 py-3 text-start">
+                <i class="fa-solid fa-file-lines fa-lg me-2"></i> <strong>Reportes de Turno</strong>
+                <br><small class="text-muted">Exportar métricas e historiales</small>
+              </a>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}
