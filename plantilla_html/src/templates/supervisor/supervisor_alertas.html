@@ -1,15 +1,8 @@
-{% extends "supervisor/base.html" %}
+{% extends "base.html" %}
 
 {% block title %}Alertas Activas - Supervisor Aceros AZA{% endblock %}
-{% block page_heading %}Alertas de Calidad{% endblock %}
-{% set active_section = 'alertas' %}
 
 {% block content %}
-<div class="alert alert-warning d-flex align-items-center gap-2 mb-3" role="note">
-  <i class="fa-solid fa-flask" aria-hidden="true"></i>
-  <span><strong>Modo supervisor:</strong> monitoreo en tiempo real conectado al registro histórico de Supabase.</span>
-</div>
-
 <section class="aza-card mb-4">
   <div class="aza-card-header">
     <span><i class="fa-solid fa-bell me-2"></i> ALERTAS RECIENTES</span>
@@ -60,7 +53,6 @@
     <div class="d-flex align-items-center gap-2 mb-2">
       <span class="small text-nowrap" style="width: 58px;">{{ day.day }}</span>
       <div class="progress flex-grow-1" role="progressbar" aria-label="Alertas del {{ day.day }}" aria-valuenow="{{ day.count }}" aria-valuemin="0" aria-valuemax="34">
-        <!-- Usamos un atributo data-width para evitar el falso positivo del linter de CSS -->
         <div class="progress-bar bg-danger barra-dinamica" data-width="{{ day.bar_width }}"></div>
       </div>
       <strong class="small text-end" style="width: 32px;">{{ day.count }}</strong>
@@ -68,6 +60,7 @@
     {% endfor %}
   </div>
 </section>
+{% endblock %}
 
 {% block extra_js %}
 <script src="{{ url_for('static', filename='js/supervisor.js') }}"></script>

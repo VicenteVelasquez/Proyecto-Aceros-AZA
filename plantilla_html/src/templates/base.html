@@ -143,7 +143,7 @@
   {# Verificamos si estamos en una página pública o sin sesión activa #}
   {% set es_publico = request.path in ['/', '/login', '/recuperar-password'] or request.path.startswith('/reset-password') or not session.get('user_id') %}
 
-  <!-- Topbar Dinámico (Se oculta limpiamente si es público) -->
+  <!-- Topbar Dinámico -->
   {% if not es_publico %}
   <div class="aza-topbar">
     <div class="brand-box">
@@ -171,7 +171,7 @@
   </div>
   {% endif %}
 
-  <!-- Estructura Condicional Global para Login / Paneles Internos -->
+  <!-- Estructura Condicional Global con un ÚNICO bloque content -->
   {% if es_publico %}
     <main class="w-100">
       {% block content %}{% endblock %}
@@ -183,7 +183,6 @@
         {% set rol = session.get('user_role', 'Operador') | lower %}
         
         {% if 'admin' in rol %}
-          <!-- MENÚ ADMINISTRADOR -->
           <a href="{{ url_for('admin_dashboard') }}" class="nav-item-aza {% if request.path == '/admin' or request.path == '/admin/dashboard' %}active{% endif %}">
             <i class="fa-solid fa-chart-pie"></i> Dashboard
           </a>
@@ -201,7 +200,6 @@
           </a>
 
         {% elif 'supervis' in rol %}
-          <!-- MENÚ SUPERVISOR -->
           <a href="{{ url_for('supervisor_dashboard') }}" class="nav-item-aza {% if 'dashboard' in request.path or request.path == '/supervisor' %}active{% endif %}">
             <i class="fa-solid fa-chart-pie"></i> Dashboard
           </a>
@@ -216,7 +214,6 @@
           </a>
 
         {% else %}
-          <!-- MENÚ OPERADOR -->
           <a href="{{ url_for('operador_camara') }}" class="nav-item-aza {% if request.endpoint == 'operador_camara' %}active{% endif %}">
             <i class="fa-solid fa-camera"></i> Cámara
           </a>
@@ -232,7 +229,7 @@
         {% endif %}
       </div>
 
-      <!-- Panel Principal que inyecta de forma segura el contenido -->
+      <!-- Panel Principal -->
       <div class="main-panel">
         {{ self.content() }}
       </div>
