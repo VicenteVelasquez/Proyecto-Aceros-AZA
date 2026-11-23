@@ -48,6 +48,7 @@
             <th>RUT</th>
             <th>Rol</th>
             <th>Estado</th>
+            <th>Bloqueo de acceso</th>
             {% if not demo_mode and management_enabled %}<th>Acciones</th>{% endif %}
           </tr>
         </thead>
@@ -60,8 +61,21 @@
             <td>{{ usuario.rut }}</td>
             <td><span class="badge bg-primary">{{ usuario.rol }}</span></td>
             <td><span class="badge {{ 'bg-success' if usuario.estado|lower == 'activo' else 'bg-secondary' }}">{{ usuario.estado }}</span></td>
+            <td>
+              {% if usuario.bloqueo_activo %}
+                <span class="badge bg-danger">Hasta {{ usuario.bloqueo_hasta_local }}</span>
+              {% else %}
+                <span class="badge bg-success">Sin bloqueo</span>
+              {% endif %}
+            </td>
             {% if not demo_mode and management_enabled %}
             <td class="text-nowrap">
+              {% if usuario.bloqueo_activo %}
+              <form action="{{ url_for('admin_usuarios_desbloquear', id=usuario.id) }}" method="POST" class="d-inline" onsubmit="return confirm('¿Desbloquear el inicio de sesión de esta cuenta? La acción quedará auditada.');">
+                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                <button type="submit" class="btn btn-sm btn-info">Desbloquear acceso</button>
+              </form>
+              {% endif %}
               <button type="button" class="btn btn-sm btn-warning" data-bs-toggle="modal" data-bs-target="#modalEditarUsuario-{{ usuario.id }}">
                 Editar
               </button>
@@ -76,7 +90,7 @@
           </tr>
           {% else %}
           <tr>
-            <td colspan="{{ 7 if not demo_mode and management_enabled else 6 }}" class="text-center text-muted py-4">
+            <td colspan="{{ 8 if not demo_mode and management_enabled else 7 }}" class="text-center text-muted py-4">
               {% if not demo_mode and management_enabled and not error %}
               No hay usuarios para mostrar o no se ha configurado la conexión a la base de datos.
               {% endif %}

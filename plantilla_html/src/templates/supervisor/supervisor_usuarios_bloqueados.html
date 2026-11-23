@@ -1,0 +1,36 @@
+{% extends "base.html" %}
+{% block title %}Cuentas bloqueadas | Supervisor{% endblock %}
+{% block content %}
+<section class="aza-card">
+  <div class="aza-card-header"><span><i class="fa-solid fa-lock me-2"></i> DESBLOQUEO DE OPERADORES</span></div>
+  <div class="aza-card-body">
+    <p>Solo se muestran operadores con bloqueo temporal vigente. Los desbloqueos se registran en una bitácora.</p>
+    {% with messages = get_flashed_messages(with_categories=true) %}
+      {% for category, message in messages %}<div class="alert alert-{{ category }}" role="alert">{{ message }}</div>{% endfor %}
+    {% endwith %}
+    {% if error %}<div class="alert alert-danger">{{ error }}</div>{% endif %}
+    <div class="table-responsive">
+      <table class="table table-striped table-bordered align-middle">
+        <thead class="table-dark"><tr><th>Operador</th><th>Correo</th><th>Bloqueado hasta (Chile)</th><th>Acción</th></tr></thead>
+        <tbody>
+        {% for usuario in usuarios %}
+          <tr>
+            <td>{{ usuario.nombre }} {{ usuario.apellidos }}</td>
+            <td>{{ usuario.email }}</td>
+            <td>{{ usuario.bloqueo_hasta_local }}</td>
+            <td>
+              <form method="POST" action="{{ url_for('supervisor_usuarios_desbloquear', id=usuario.id) }}" onsubmit="return confirm('¿Desbloquear esta cuenta de Operador?');">
+                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                <button class="btn btn-sm btn-warning" type="submit">Quitar bloqueo</button>
+              </form>
+            </td>
+          </tr>
+        {% else %}
+          <tr><td colspan="4" class="text-center">No hay operadores con bloqueos vigentes.</td></tr>
+        {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+</section>
+{% endblock %}

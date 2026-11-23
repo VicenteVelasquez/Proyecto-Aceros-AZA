@@ -209,6 +209,9 @@
           <a href="{{ url_for('supervisor_lotes') }}" class="nav-item-aza {% if 'lotes' in request.path %}active{% endif %}">
             <i class="fa-solid fa-boxes-stacked"></i> Lotes
           </a>
+          <a href="{{ url_for('supervisor_usuarios_bloqueados') }}" class="nav-item-aza {% if 'usuarios-bloqueados' in request.path %}active{% endif %}">
+            <i class="fa-solid fa-user-lock"></i> Desbloqueos
+          </a>
           <a href="{{ url_for('supervisor_reportes') }}" class="nav-item-aza {% if 'reportes' in request.path %}active{% endif %}">
             <i class="fa-solid fa-file-excel"></i> Reportes
           </a>

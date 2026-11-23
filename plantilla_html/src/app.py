@@ -10,11 +10,27 @@ from psycopg2.extras import RealDictCursor
 from werkzeug.security import check_password_hash, generate_password_hash
 import secrets
 from decimal import Decimal, InvalidOperation
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
+import sys
 from zoneinfo import ZoneInfo
+from pathlib import Path
+from dotenv import load_dotenv
+
+load_dotenv(Path(__file__).resolve().parent.parent / ".env")
+
+# Biblioteca compartida con ms_autenticacion para evitar rutas de acceso sin bloqueo.
+sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..', '..')))
+from shared_auth.security import authenticate, unlock_account
 
 app = Flask(__name__)
-app.secret_key = os.getenv('SECRET_KEY', 'clave_secreta_segura_aza')
+app.secret_key = os.getenv('SECRET_KEY')
+if not app.secret_key:
+    raise RuntimeError('Configure SECRET_KEY en las variables de entorno.')
+app.config.update(
+    SESSION_COOKIE_HTTPONLY=True,
+    SESSION_COOKIE_SAMESITE='Lax',
+    SESSION_COOKIE_SECURE=os.getenv('FLASK_SECURE_COOKIES', '0') == '1',
+)
 app.config['SIMULATE_USER_STATUS'] = os.getenv('SIMULATE_USER_STATUS') == '1'
 CHILE_TIMEZONE = ZoneInfo('America/Santiago')
 
@@ -31,7 +47,9 @@ def turno_actual(now=None):
     return 'Turno Mañana' if current_time.hour < 12 else 'Turno Tarde'
 
 # Conexión a la base de datos en PostgreSQL (Supabase)
-DB_URI = os.getenv("DATABASE_URL", "postgresql://postgres.mtccxutquyokrysolcfr:bicho.7892614@aws-1-us-west-2.pooler.supabase.com:6543/postgres")
+DB_URI = os.getenv('DATABASE_URL')
+if not DB_URI:
+    raise RuntimeError('Configure DATABASE_URL en las variables de entorno.')
 
 def get_db_connection():
     conn = psycopg2.connect(DB_URI, cursor_factory=RealDictCursor)
@@ -197,6 +215,39 @@ def enforce_role_access():
             return jsonify({"status": "error", "mensaje": "Sesión expirada o no autorizada."}), 401
         return redirect(url_for('login_view'))
 
+    # Invalidar sesiones abiertas si la cuenta fue bloqueada, desactivada o cambió de rol.
+    # Los permisos se verifican en servidor, no únicamente mediante la cookie firmada.
+    verify_conn = None
+    try:
+        verify_conn = get_db_connection()
+        with verify_conn.cursor() as verify_cur:
+            verify_cur.execute("""
+                SELECT f.estado, f.bloqueado_hasta, COALESCE(r.nombre_rol, '') AS rol
+                  FROM ficha_personal f LEFT JOIN roles r ON r.id = f.rol_id
+                 WHERE f.id = %s;
+            """, (session['user_id'],))
+            account = verify_cur.fetchone()
+        valid = (
+            account is not None
+            and account['estado'] == 'Activo'
+            and (account['bloqueado_hasta'] is None or account['bloqueado_hasta'] <= datetime.now(timezone.utc))
+            and role_home_endpoint(account['rol']) == role_home_endpoint(session.get('user_role'))
+        )
+        if not valid:
+            session.clear()
+            if request.path.startswith('/api/'):
+                return jsonify({'status': 'error', 'mensaje': 'Acceso suspendido o sesión inválida.'}), 401
+            flash('La sesión dejó de estar autorizada. Inicie sesión nuevamente.', 'warning')
+            return redirect(url_for('login_view'))
+    except Exception:
+        app.logger.exception('No se pudo comprobar el estado de la sesión')
+        if request.path.startswith('/api/'):
+            return jsonify({'status': 'error', 'mensaje': 'No se pudo comprobar la sesión.'}), 503
+        return 'No se pudo comprobar la sesión. Intente nuevamente.', 503
+    finally:
+        if verify_conn:
+            verify_conn.close()
+
     endpoint = role_home_endpoint(session.get('user_role'))
     role_by_endpoint = {
         'admin_dashboard': 'admin',
@@ -218,7 +269,7 @@ def enforce_role_access():
 
 @app.before_request
 def validate_admin_csrf():
-    if request.method == 'POST' and request.path.startswith('/admin/'):
+    if request.method == 'POST' and (request.path.startswith('/admin/') or request.path.startswith('/supervisor/usuarios-bloqueados/')):
         expected_token = session.get('csrf_token', '')
         submitted_token = request.form.get('csrf_token', '')
         if not expected_token or not hmac.compare_digest(expected_token, submitted_token):
@@ -243,43 +294,46 @@ def home():
 @app.route('/login', methods=['GET', 'POST'])
 def login_view():
     error = None
+    status_code = 200
     if request.method == 'POST':
         session.clear()
-        email = request.form.get('email', '').strip()
+        email = request.form.get('email', '').strip()[:254]
         password = request.form.get('password', '')
-        
+        conn = None
         try:
             conn = get_db_connection()
-            cur = conn.cursor()
-            
-            cur.execute("""
-                SELECT f.id, f.nombre, f.email, f.contrasena_hash, COALESCE(r.nombre_rol, 'Operador') AS rol 
-                FROM ficha_personal f
-                LEFT JOIN roles r ON f.rol_id = r.id
-                WHERE LOWER(TRIM(f.email)) = LOWER(TRIM(%s)) AND f.estado = 'Activo';
-            """, (email,))
-            
-            user = cur.fetchone()
-            cur.close()
-            conn.close()
-
-            if user and check_password_hash(user['contrasena_hash'], password):
+            status, user = authenticate(conn, email, password)
+            if status == 'ok':
                 endpoint = role_home_endpoint(user['rol'])
                 if endpoint is None:
-                    error = "La cuenta no tiene un rol válido asignado."
-                    return render_template('login.html', error=error), 403
-
-                session['user_id'] = user['id']
-                session['user_email'] = user['email']
-                session['user_role'] = user['rol']
-                session['user_nombre'] = user['nombre']
-                return redirect(url_for(endpoint))
+                    conn.rollback()
+                    error = 'La cuenta no tiene un rol válido asignado.'
+                    status_code = 403
+                else:
+                    conn.commit()
+                    session['user_id'] = user['id']
+                    session['user_email'] = user['email']
+                    session['user_role'] = user['rol']
+                    session['user_nombre'] = user['nombre']
+                    return redirect(url_for(endpoint))
             else:
-                error = "Credenciales incorrectas o usuario inactivo."
-        except Exception as e:
-            error = f"Error en el servidor al intentar iniciar sesión: {e}"
-
-    return render_template('login.html', error=error)
+                conn.commit()
+                if status == 'locked':
+                    error = 'Acceso temporalmente bloqueado. Intente nuevamente en 15 minutos o contacte a un responsable autorizado.'
+                    status_code = 429
+                else:
+                    error = 'Credenciales incorrectas o usuario inactivo.'
+                    status_code = 401
+        except Exception:
+            if conn:
+                conn.rollback()
+            app.logger.exception('Fallo en autenticación web')
+            error = 'No se pudo procesar el acceso. Intente nuevamente más tarde.'
+            status_code = 503
+        finally:
+            if conn:
+                conn.close()
+    return render_template('login.html', error=error), status_code
 
 @app.route('/logout')
 def logout():
@@ -313,10 +367,9 @@ def recuperar_password():
                 """, (token, expiracion, user_id))
                 conn.commit()
                 
-                link_reset = url_for('reset_password', token=token, _external=True)
-                print(f"[RECUPERACIÓN AZA] Enlace de restablecimiento para {email}: {link_reset}")
-                
-                flash("Se han enviado las instrucciones de recuperación a su correo corporativo.", "success")
+                # TODO: configurar proveedor de correo transaccional antes de habilitar entrega.
+                # Nunca registrar ni mostrar tokens de recuperación en logs.
+                flash("El envío de recuperación por correo está pendiente de configuración. Consulte al administrador.", "info")
             else:
                 flash("Si el correo está registrado, recibirá las instrucciones en breve.", "info")
                 
@@ -325,7 +378,8 @@ def recuperar_password():
             return redirect(url_for('login_view'))
         except Exception as e:
             if conn: conn.close()
-            flash(f"Error al procesar la solicitud: {e}", "danger")
+            app.logger.exception('Error solicitando recuperación')
+            flash("No se pudo procesar la solicitud.", "danger")
             
     return render_template('auth/recuperar_password.html')
 
@@ -376,7 +430,8 @@ def reset_password(token):
         conn.close()
     except Exception as e:
         if conn: conn.close()
-        flash(f"Error en el sistema: {e}", "danger")
+        app.logger.exception('Error restableciendo contraseña')
+        flash("No se pudo procesar la solicitud.", "danger")
         return redirect(url_for('login_view'))
         
     return render_template('auth/reset_password.html', token=token)
@@ -1145,7 +1200,9 @@ def admin_usuarios_list():
         cur.execute("""
             SELECT f.id, f.nombre, f.apellidos, f.email, f.rut, 
                    COALESCE(r.nombre_rol, 'Operador') AS rol, 
-                   COALESCE(f.estado, 'Activo') AS estado 
+                   COALESCE(f.estado, 'Activo') AS estado,
+                   (f.bloqueado_hasta > NOW()) AS bloqueo_activo,
+                   TO_CHAR(f.bloqueado_hasta AT TIME ZONE 'America/Santiago', 'DD/MM/YYYY HH24:MI') AS bloqueo_hasta_local
             FROM ficha_personal f
             LEFT JOIN roles r ON f.rol_id = r.id
             ORDER BY f.id ASC;
@@ -1270,6 +1327,62 @@ def admin_usuarios_activar(id):
         if cur: cur.close()
         if conn: conn.close()
     return redirect(url_for('admin_usuarios_list'))
+
+# --- Desbloqueo de seguridad: cambios autorizados y auditados ---
+@app.route('/admin/usuarios/desbloquear/<int:id>', methods=['POST'])
+def admin_usuarios_desbloquear(id):
+    return process_manual_unlock(id, 'admin_usuarios_list')
+
+@app.route('/supervisor/usuarios-bloqueados', methods=['GET'])
+def supervisor_usuarios_bloqueados():
+    conn = None
+    try:
+        conn = get_db_connection()
+        with conn.cursor() as cur:
+            cur.execute("""
+                SELECT f.id, f.nombre, f.apellidos, f.email,
+                       TO_CHAR(f.bloqueado_hasta AT TIME ZONE 'America/Santiago', 'DD/MM/YYYY HH24:MI') AS bloqueo_hasta_local
+                FROM ficha_personal f JOIN roles r ON r.id = f.rol_id
+                WHERE LOWER(TRIM(r.nombre_rol)) IN ('operador', 'operadora', 'operario', 'operator')
+                  AND f.estado = 'Activo' AND f.bloqueado_hasta > NOW()
+                ORDER BY f.bloqueado_hasta ASC;
+            """)
+            usuarios = cur.fetchall()
+        return render_template('supervisor/supervisor_usuarios_bloqueados.html', usuarios=usuarios, error=None)
+    except Exception:
+        app.logger.exception('No se pudieron consultar bloqueos')
+        return render_template('supervisor/supervisor_usuarios_bloqueados.html', usuarios=[], error='No se pudieron consultar los bloqueos.'), 503
+    finally:
+        if conn:
+            conn.close()
+
+@app.route('/supervisor/usuarios-bloqueados/desbloquear/<int:id>', methods=['POST'])
+def supervisor_usuarios_desbloquear(id):
+    return process_manual_unlock(id, 'supervisor_usuarios_bloqueados')
+
+def process_manual_unlock(target_id, return_endpoint):
+    conn = None
+    try:
+        conn = get_db_connection()
+        status = unlock_account(conn, session.get('user_id'), session.get('user_role'), target_id)
+        if status == 'forbidden':
+            conn.rollback()
+            return 'No tiene permisos para desbloquear esta cuenta.', 403
+        if status == 'ok':
+            conn.commit()
+            flash('Bloqueo de inicio de sesión retirado. Acción registrada en auditoría.', 'success')
+        else:
+            conn.rollback()
+            flash('La cuenta no tiene un bloqueo vigente o no existe.', 'warning')
+    except Exception:
+        if conn:
+            conn.rollback()
+        app.logger.exception('No se pudo desbloquear cuenta')
+        flash('No fue posible desbloquear la cuenta.', 'danger')
+    finally:
+        if conn:
+            conn.close()
+    return redirect(url_for(return_endpoint))
 
 # --- CRUD Producción ---
 @app.route('/admin/produccion', methods=['GET'])
@@ -1418,4 +1531,4 @@ def error_500(e):
 
 
 if __name__ == '__main__':
-    app.run(host='0.0.0.0', port=5000, debug=True)
+    app.run(host='127.0.0.1', port=5000, debug=os.getenv('FLASK_DEBUG', 'false').lower() == 'true')
