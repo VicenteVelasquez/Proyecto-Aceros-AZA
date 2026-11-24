@@ -8,11 +8,14 @@
         
         <!-- Encabezado de Identidad de Planta -->
         <div class="text-center mb-4">
-          <div class="text-success mb-2" style="font-size: 2.8rem;">
-            <i class="fa-solid fa-industry"></i>
-          </div>
-          <h3 class="fw-bold text-dark mb-1">Aceros AZA</h3>
-          <p class="text-muted small">Sistema de Monitoreo y Trazabilidad (1660 FPS)</p>
+          <img
+            src="{{ url_for('static', filename='img/Logo-aza2.png') }}"
+            alt="Logo Aceros AZA"
+            class="img-fluid mb-3"
+            style="max-height: 64px; width: auto;"
+          >
+          <h3 class="fw-bold text-dark mb-1"></h3>
+          <p class="text-muted small mb-0">Sistema de Monitoreo y Trazabilidad</p>
         </div>
 
         <!-- Mensajes Flash de Error o Éxito -->

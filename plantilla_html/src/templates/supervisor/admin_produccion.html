@@ -1,0 +1,130 @@
+{% extends "base.html" %}
+
+{% block title %}Producción - Administración Aceros AZA{% endblock %}
+{% block page_heading %}Gestión de Producción{% endblock %}
+{% set active_section = 'produccion' %}
+
+{% block content %}
+<section class="aza-card">
+  <div class="aza-card-header">
+    <span><i class="fa-solid fa-industry me-2"></i> LOTES DE PRODUCCIÓN</span>
+    {% if demo_mode %}
+    <span class="badge bg-light text-dark">Solo lectura</span>
+    {% elif not error and management_enabled %}
+    <button class="btn btn-sm btn-light fw-bold text-success" data-bs-toggle="modal" data-bs-target="#modalCrearLote">
+      <i class="fa-solid fa-plus me-1"></i> Nuevo Lote
+    </button>
+    {% elif not error %}
+    <span class="badge bg-light text-dark">Gestión no configurada</span>
+    {% endif %}
+  </div>
+  <div class="aza-card-body">
+    {% with messages = get_flashed_messages(with_categories=true) %}
+      {% for category, message in messages %}
+      <div class="alert alert-{{ category }}" role="alert">{{ message }}</div>
+      {% endfor %}
+    {% endwith %}
+    
+    {% if error %}
+    <div class="alert alert-warning" role="alert">{{ error }}</div>
+    {% endif %}
+
+    <div class="table-responsive">
+      <table class="table table-striped table-bordered align-middle mb-0">
+        <thead class="table-dark">
+          <tr>
+            <th>ID</th>
+            <th>Código de lote</th>
+            <th>Estado</th>
+            {% if not demo_mode and management_enabled %}<th>Acciones</th>{% endif %}
+          </tr>
+        </thead>
+        <tbody>
+          {% for lote in lotes %}
+          <tr>
+            <td><strong>#{{ lote.id }}</strong></td>
+            <td>{{ lote.codigo_lote }}</td>
+            <td>
+              {% if lote.estado|lower == 'activo' %}
+              <span class="badge bg-success">{{ lote.estado }}</span>
+              {% elif lote.estado|lower in ['cerrado', 'finalizado', 'archivado'] %}
+              <span class="badge bg-secondary">{{ lote.estado }}</span>
+              {% else %}
+              <span class="badge bg-primary">{{ lote.estado }}</span>
+              {% endif %}
+            </td>
+            {% if not demo_mode and management_enabled %}
+            <td class="text-nowrap">
+              <details class="d-inline-block me-1">
+                <summary class="btn btn-sm btn-warning">Editar</summary>
+                <form action="{{ url_for('admin_produccion_editar', id=lote.id) }}" method="POST" class="border rounded p-3 mt-2 text-start bg-light shadow-sm position-absolute" style="z-index: 10; width: 280px;">
+                  <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                  <label class="form-label text-dark fw-bold" for="codigo-lote-{{ lote.id }}">Código</label>
+                  <input id="codigo-lote-{{ lote.id }}" name="codigo_lote" class="form-control mb-2" value="{{ lote.codigo_lote }}" maxlength="50" required>
+                  <label class="form-label text-dark fw-bold" for="estado-lote-{{ lote.id }}">Estado</label>
+                  <select id="estado-lote-{{ lote.id }}" name="estado" class="form-select mb-2" required>
+                    {% for status in ['Activo', 'En Proceso', 'Finalizado', 'Rechazado', 'Archivado', 'Inactivo'] %}
+                    <option value="{{ status }}" {% if status|lower == lote.estado|lower %}selected{% endif %}>{{ status }}</option>
+                    {% endfor %}
+                  </select>
+                  <button type="submit" class="btn btn-success btn-sm w-100">Guardar cambios</button>
+                </form>
+              </details>
+              
+              {% if lote.estado|lower == 'inactivo' %}
+              <form action="{{ url_for('admin_produccion_editar', id=lote.id) }}" method="POST" class="d-inline">
+                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                <input type="hidden" name="codigo_lote" value="{{ lote.codigo_lote }}">
+                <input type="hidden" name="estado" value="Activo">
+                <button type="submit" class="btn btn-sm btn-success">Activar</button>
+              </form>
+              {% else %}
+              <form action="{{ url_for('admin_produccion_desactivar', id=lote.id) }}" method="POST" class="d-inline" onsubmit="return confirm('¿Confirma desactivar este lote?');">
+                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                <button type="submit" class="btn btn-sm btn-danger">Desactivar</button>
+              </form>
+              {% endif %}
+            </td>
+            {% endif %}
+          </tr>
+          {% else %}
+          <tr>
+            <td colspan="{{ 4 if not demo_mode and management_enabled else 3 }}" class="text-center text-muted py-4">
+              {% if not error %}
+              No hay lotes registrados en el sistema.
+              {% endif %}
+            </td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+    <p class="text-muted small mt-3 mb-0">Gestión de lotes de laminación y control de calidad industrial. Al desactivar un lote se conserva su registro histórico.</p>
+  </div>
+</section>
+
+{% if not demo_mode and management_enabled and not error %}
+<div class="modal fade" id="modalCrearLote" tabindex="-1" aria-hidden="true">
+  <div class="modal-dialog">
+    <div class="modal-content text-dark">
+      <form action="{{ url_for('admin_produccion_crear') }}" method="POST">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+        <div class="modal-header bg-success text-white">
+          <h2 class="modal-title fs-5">Crear lote de producción</h2>
+          <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Cerrar"></button>
+        </div>
+        <div class="modal-body">
+          <label class="form-label" for="codigo-lote-nuevo">Código de lote</label>
+          <input id="codigo-lote-nuevo" name="codigo_lote" class="form-control" maxlength="50" required placeholder="Ej: LOTE-AZA-2026">
+          <p class="form-text mb-0">El lote se registrará inicialmente en estado Activo.</p>
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
+          <button type="submit" class="btn btn-success">Crear lote</button>
+        </div>
+      </form>
+    </div>
+  </div>
+</div>
+{% endif %}
+{% endblock %}

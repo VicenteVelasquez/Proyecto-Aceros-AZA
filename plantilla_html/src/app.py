@@ -1,4 +1,4 @@
-from flask import Flask, render_template, request, jsonify, session, redirect, url_for, flash, Response
+from flask import Flask, render_template, request, jsonify, session, redirect, url_for, flash, Response, make_response
 import os
 import io
 import csv
@@ -21,6 +21,16 @@ load_dotenv(Path(__file__).resolve().parent.parent / ".env")
 # Biblioteca compartida con ms_autenticacion para evitar rutas de acceso sin bloqueo.
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..', '..')))
 from shared_auth.security import authenticate, unlock_account
+if __package__:
+    from .dashboard_data import get_supervisor_dashboard_data, get_admin_dashboard_data
+else:
+    from dashboard_data import get_supervisor_dashboard_data, get_admin_dashboard_data
+if __package__:
+    from .reportes_data import REPORT_TYPES, MAX_EXPORT, MAX_PREVIEW, InvalidReport, get_report, parse_filters
+    from .reportes_export import export as export_report
+else:
+    from reportes_data import REPORT_TYPES, MAX_EXPORT, MAX_PREVIEW, InvalidReport, get_report, parse_filters
+    from reportes_export import export as export_report
 
 app = Flask(__name__)
 app.secret_key = os.getenv('SECRET_KEY')
@@ -201,6 +211,8 @@ def enforce_role_access():
         '/supervisor': 'supervisor',
         '/operador': 'operator',
         '/api/operador': 'operator',
+        '/api/supervisor': 'supervisor',
+        '/api/admin': 'admin',
     }
     required_role = next(
         (role for prefix, role in protected_sections.items()
@@ -730,163 +742,39 @@ def api_guardar_observacion():
 # ==========================================
 # PANEL DE SUPERVISOR
 # ==========================================
+def _dashboard_response(loader, template_name):
+    """Obtiene una instantánea real, sin caché ni cifras de relleno."""
+    conn = None
+    try:
+        conn = get_db_connection()
+        context = loader(conn)
+        response = make_response(render_template(template_name, **context))
+        response.headers['Cache-Control'] = 'no-store, private'
+        return response
+    except Exception:
+        app.logger.exception('Error al consultar el dashboard de PostgreSQL')
+        if request.path.startswith('/api/'):
+            response = make_response('No fue posible actualizar los indicadores.', 503)
+        else:
+            response = make_response(render_template('errores/dashboard_no_disponible.html'), 503)
+        response.headers['Cache-Control'] = 'no-store, private'
+        return response
+    finally:
+        if conn is not None:
+            conn.close()
+
+
 @app.route('/supervisor')
 @app.route('/supervisor/dashboard')
 def supervisor_dashboard():
-    try:
-        conn = get_db_connection()
-        cur = conn.cursor()
-        
-        # 1. Lotes activos
-        cur.execute("SELECT COUNT(*) AS count FROM lote_fabricacion WHERE estado = 'Activo';")
-        res_active = cur.fetchone()
-        active_lots = res_active['count'] if res_active else 0
-        
-        # 2. Lecturas analizadas
-        cur.execute("SELECT COUNT(*) AS count FROM registro_historico;")
-        res_readings = cur.fetchone()
-        readings = res_readings['count'] if res_readings else 0
-        
-        # 3. Porcentaje dentro de tolerancia
-        cur.execute("""
-            SELECT 
-                COALESCE(
-                    SUM(CASE WHEN resultado_final = 'Aprobado' THEN 1 ELSE 0 END) * 100.0 / 
-                    NULLIF(COUNT(*), 0), 
-                100.0) AS within_tol
-            FROM registro_historico;
-        """)
-        tol_res = cur.fetchone()
-        raw_tol = tol_res['within_tol'] if (tol_res and tol_res.get('within_tol') is not None) else 100.0
-        within_tolerance = round(float(raw_tol), 1)
-        
-        # 4. Alertas de calidad (Rechazados)
-        cur.execute("SELECT COUNT(*) AS count FROM registro_historico WHERE resultado_final = 'Rechazado';")
-        res_alerts = cur.fetchone()
-        alerts = res_alerts['count'] if res_alerts else 0
-        
-        # 5. Producción diaria (gráfico)
-        cur.execute("""
-            SELECT TO_CHAR(fecha_registro, 'Dy') AS day, COUNT(*) AS count 
-            FROM registro_historico 
-            GROUP BY TO_CHAR(fecha_registro, 'Dy'), DATE(fecha_registro) 
-            ORDER BY DATE(fecha_registro) DESC 
-            LIMIT 7;
-        """)
-        raw_prod = cur.fetchall()
-        production_by_day = []
-        max_prod = max([int(r.get('count', 0)) for r in raw_prod], default=10) or 10
-        for row in raw_prod:
-            count = int(row.get('count', 0))
-            bar_width = min(int((count / max_prod) * 100), 100)
-            production_by_day.append({'day': row.get('day', 'Día'), 'count': count, 'bar_width': bar_width})
-            
-        # 6. Tendencia de calidad por día
-        cur.execute("""
-            SELECT TO_CHAR(fecha_registro, 'Dy') AS day, 
-                   ROUND(SUM(CASE WHEN resultado_final = 'Aprobado' THEN 1 ELSE 0 END) * 100.0 / COUNT(*), 1) AS percentage
-            FROM registro_historico 
-            GROUP BY TO_CHAR(fecha_registro, 'Dy'), DATE(fecha_registro) 
-            ORDER BY DATE(fecha_registro) DESC 
-            LIMIT 7;
-        """)
-        raw_qual = cur.fetchall()
-        quality_by_day = []
-        for row in raw_qual:
-            pct = float(row.get('percentage') or 100.0)
-            quality_by_day.append({'day': row.get('day', 'Día'), 'percentage': pct})
-            
-        # 7. Estadísticas de Comportamiento de Operadores (Nueva sección)
-        # Adaptado a la estructura de tus tablas de personal/lotes
-        try:
-            cur.execute("""
-                SELECT 
-                    COALESCE(fp.nombre || ' ' || fp.apellidos, 'Operador General') AS name,
-                    'Turno Planta' AS shift,
-                    COUNT(l.id) AS lots_count,
-                    95.0 AS efficiency
-                FROM lote_fabricacion l
-                LEFT JOIN ficha_personal fp ON l.personal_id = fp.personal_id
-                GROUP BY fp.nombre, fp.apellidos
-                LIMIT 5;
-            """)
-            raw_ops = cur.fetchall()
-            operators_stats = []
-            for row in raw_ops:
-                operators_stats.append({
-                    'name': row.get('name', 'Operador'),
-                    'shift': row.get('shift', 'Turno A'),
-                    'lots_count': int(row.get('lots_count', 0)),
-                    'efficiency': float(row.get('efficiency', 95.0))
-                })
-        except Exception:
-            operators_stats = [] # Por si la columna personal_id varía temporalmente en tu esquema
+    return _dashboard_response(get_supervisor_dashboard_data, 'supervisor/supervisor_dashboard.html')
 
-        # 8. Totales de producción por período (Día, Semana, Mes)
-        cur.execute("SELECT COUNT(*) AS count FROM registro_historico WHERE DATE(fecha_registro) = CURRENT_DATE;")
-        res_day_tot = cur.fetchone()
-        prod_day_total = f"{res_day_tot['count']} registros" if res_day_tot else "0 registros"
 
-        cur.execute("SELECT COUNT(*) AS count FROM registro_historico WHERE fecha_registro >= NOW() - INTERVAL '7 days';")
-        res_week_tot = cur.fetchone()
-        prod_week_total = f"{res_week_tot['count']} registros" if res_week_tot else "0 registros"
+@app.route('/api/supervisor/dashboard', methods=['GET'])
+def api_supervisor_dashboard():
+    return _dashboard_response(get_supervisor_dashboard_data, 'supervisor/_dashboard_content.html')
 
-        cur.execute("SELECT COUNT(*) AS count FROM registro_historico WHERE fecha_registro >= NOW() - INTERVAL '30 days';")
-        res_month_tot = cur.fetchone()
-        prod_month_total = f"{res_month_tot['count']} registros" if res_month_tot else "0 registros"
 
-        # 9. Lotes recientes
-        cur.execute("""
-            SELECT l.codigo_lote AS code, 
-                   TO_CHAR(l.fecha_creacion, 'YYYY-MM-DD HH24:MI') AS date_label, 
-                   COALESCE(r.codigo_receta, 'Receta General') AS recipe, 
-                   COALESCE(l.estado, 'Activo') AS status 
-            FROM lote_fabricacion l
-            LEFT JOIN receta_alambre r ON l.receta_id = r.id
-            ORDER BY l.id DESC 
-            LIMIT 5;
-        """)
-        raw_lots = cur.fetchall()
-        lots = []
-        for row in raw_lots:
-            status = row.get('status', 'Activo')
-            style = 'bg-success' if status.lower() == 'activo' else 'bg-secondary'
-            lots.append({
-                'code': row.get('code', 'LOTE-00'),
-                'date_label': row.get('date_label', 'N/A'),
-                'recipe': row.get('recipe', 'AZA'),
-                'status': status,
-                'style': style
-            })
-            
-        cur.close()
-        conn.close()
-    except Exception as e:
-        active_lots, readings, within_tolerance, alerts = 0, 0, 100.0, 0
-        production_by_day = []
-        quality_by_day = []
-        operators_stats = []
-        prod_day_total, prod_week_total, prod_month_total = "0", "0", "0"
-        lots = []
-
-    if not production_by_day:
-        production_by_day = [{'day': 'Hoy', 'count': 0, 'bar_width': 0}]
-    if not quality_by_day:
-        quality_by_day = [{'day': 'Hoy', 'percentage': 100.0}]
-
-    # Empaquetamos todo dentro del diccionario dashboard que consume el nuevo HTML
-    dashboard = {
-        'period': 'Últimos 7 días',
-        'summary': {'active_lots': active_lots, 'readings': readings, 'within_tolerance': within_tolerance, 'alerts': alerts},
-        'production_by_day': production_by_day,
-        'quality_by_day': quality_by_day,
-        'operators_stats': operators_stats,
-        'production_day_total': prod_day_total,
-        'production_week_total': prod_week_total,
-        'production_month_total': prod_month_total
-    }
-
-    return render_template('supervisor/supervisor_dashboard.html', dashboard=dashboard, lots=lots)
 @app.route('/supervisor/alertas', methods=['GET'])
 def supervisor_alertas():
     estado_filtro = request.args.get('estado', 'Rechazado').strip()
@@ -1010,54 +898,67 @@ def supervisor_lotes():
 
     return render_template('supervisor/supervisor_lotes.html', lots=lots, lot_query=lot_query, selected_date=selected_date, estado_query=estado_query)
 
+# Los reportes se obtienen del mismo PostgreSQL que alimenta los dashboards.
+# El filtrado, la vista previa y los archivos usan una única fuente de datos.
+def _report_page(role, template):
+    try:
+        filters = parse_filters(request.args, role)
+    except InvalidReport as exc:
+        return render_template(template, report_types=REPORT_TYPES[role],
+                               filters={}, report=None, error=str(exc)), 400
+
+    conn = None
+    try:
+        conn = get_db_connection()
+        report = get_report(conn, role, filters, limit=MAX_PREVIEW)
+        resp = make_response(render_template(template, report_types=REPORT_TYPES[role],
+                                             filters=filters, report=report, error=None))
+        resp.headers['Cache-Control'] = 'no-store, private'
+        return resp
+    except Exception:
+        app.logger.exception('No se pudo consultar el reporte en PostgreSQL')
+        return render_template(template, report_types=REPORT_TYPES[role], filters=filters,
+                               report=None, error='No fue posible consultar los reportes en Supabase.'), 503
+    finally:
+        if conn is not None:
+            conn.close()
+
+
+def _report_download(role, page_endpoint):
+    conn = None
+    try:
+        formato = (request.args.get('formato') or 'xlsx').lower().strip()
+        if formato not in MAX_EXPORT:
+            raise InvalidReport('Seleccione un formato de exportación admitido.')
+        filters = parse_filters(request.args, role)
+        conn = get_db_connection()
+        data = get_report(conn, role, filters, limit=MAX_EXPORT[formato])
+        content, mime = export_report(data, formato)
+        filename = f"aza_{role}_{filters['tipo']}.{formato}"
+        resp = make_response(content)
+        resp.headers['Content-Type'] = mime
+        resp.headers['Content-Disposition'] = f'attachment; filename="{filename}"'
+        resp.headers['Cache-Control'] = 'no-store, private'
+        resp.headers['X-Content-Type-Options'] = 'nosniff'
+        return resp
+    except InvalidReport as exc:
+        return str(exc), 400
+    except Exception:
+        app.logger.exception('Error al generar un reporte con datos de PostgreSQL')
+        return 'No fue posible generar el reporte. Revise la conexión y los registros.', 503
+    finally:
+        if conn is not None:
+            conn.close()
+
+
 @app.route('/supervisor/reportes', methods=['GET'])
 def supervisor_reportes():
-    report_types = {
-        'resumen_general': 'Resumen General de Planta',
-        'produccion_diaria': 'Reporte de Producción Diaria',
-        'tendencia_calidad': 'Tendencia de Calidad y Tolerancias',
-        'alertas_activas': 'Reporte de Alertas Recientes (Rechazado)'
-    }
-    return render_template('supervisor/supervisor_reportes.html', report_types=report_types)
+    return _report_page('supervisor', 'supervisor/supervisor_reportes.html')
+
 
 @app.route('/supervisor/reportes/descargar', methods=['GET'])
 def supervisor_reportes_descargar():
-    tipo = request.args.get('tipo', 'resumen_general')
-    try:
-        conn = get_db_connection()
-        cur = conn.cursor()
-        query = """
-            SELECT id, fecha_registro, lote_id, receta_id, codigo_batch,
-                   angulo_medio, limite_min, limite_max, resultado_final, observacion
-            FROM registro_historico
-        """
-        if tipo == 'alertas_activas':
-            query += " WHERE resultado_final = 'Rechazado'"
-        query += " ORDER BY id DESC LIMIT 500;"
-
-        cur.execute(query)
-        rows = cur.fetchall()
-        cur.close()
-        conn.close()
-
-        output = io.StringIO()
-        writer = csv.writer(output, delimiter=';')
-        writer.writerow(['ID_Inspeccion', 'Fecha_Hora', 'Lote_ID', 'Receta_ID', 'Batch', 'Angulo_Medido', 'Limite_Min', 'Limite_Max', 'Estado', 'Observacion'])
-        for r in rows:
-            writer.writerow([
-                r['id'], r['fecha_registro'], r['lote_id'], r['receta_id'],
-                r['codigo_batch'], r['angulo_medio'], r['limite_min'], r['limite_max'],
-                r['resultado_final'], r['observacion'] or ''
-            ])
-
-        return Response(
-            output.getvalue().encode('utf-8-sig'),
-            mimetype='text/csv',
-            headers={'Content-Disposition': f'attachment; filename=reporte_supervisor_{tipo}.csv'}
-        )
-    except Exception as e:
-        flash(f"Error al descargar el reporte: {e}", "danger")
-        return redirect(url_for('supervisor_reportes'))
+    return _report_download('supervisor', 'supervisor_reportes')
 
 
 # ==========================================
@@ -1066,7 +967,13 @@ def supervisor_reportes_descargar():
 @app.route('/admin')
 @app.route('/admin/dashboard')
 def admin_dashboard():
-    return render_template('administrador/admin_dashboard.html')
+    return _dashboard_response(get_admin_dashboard_data, 'administrador/admin_dashboard.html')
+
+
+@app.route('/api/admin/dashboard', methods=['GET'])
+def api_admin_dashboard():
+    return _dashboard_response(get_admin_dashboard_data, 'administrador/_dashboard_content.html')
+
 
 # --- CRUD Recetas ---
 @app.route('/admin/recetas', methods=['GET'])
@@ -1470,48 +1377,12 @@ def admin_produccion_desactivar(id):
 # --- Reportes Administración ---
 @app.route('/admin/reportes', methods=['GET'])
 def admin_reportes_list():
-    report_types = {
-        'general': 'Reporte General (Producción + Calidad + Lotes)',
-        'produccion': 'Reporte de Producción y Trazabilidad',
-        'calidad': 'Reporte de Calidad y Recetas',
-        'lotes': 'Reporte de Lotes y Alertas'
-    }
-    return render_template('administrador/admin_reportes.html', report_types=report_types, demo_mode=False)
+    return _report_page('admin', 'administrador/admin_reportes.html')
+
 
 @app.route('/admin/reportes/descargar', methods=['GET'])
 def admin_reportes_descargar():
-    tipo = request.args.get('tipo', 'general')
-    try:
-        conn = get_db_connection()
-        cur = conn.cursor()
-        cur.execute("""
-            SELECT id, fecha_registro, lote_id, receta_id, codigo_batch,
-                   angulo_medio, limite_min, limite_max, resultado_final, observacion
-            FROM registro_historico
-            ORDER BY id DESC LIMIT 500;
-        """)
-        rows = cur.fetchall()
-        cur.close()
-        conn.close()
-
-        output = io.StringIO()
-        writer = csv.writer(output, delimiter=';')
-        writer.writerow(['ID_Inspeccion', 'Fecha_Hora', 'Lote_ID', 'Receta_ID', 'Batch', 'Angulo_Medido', 'Limite_Min', 'Limite_Max', 'Estado', 'Observacion'])
-        for r in rows:
-            writer.writerow([
-                r['id'], r['fecha_registro'], r['lote_id'], r['receta_id'],
-                r['codigo_batch'], r['angulo_medio'], r['limite_min'], r['limite_max'],
-                r['resultado_final'], r['observacion'] or ''
-            ])
-
-        return Response(
-            output.getvalue().encode('utf-8-sig'),
-            mimetype='text/csv',
-            headers={'Content-Disposition': f'attachment; filename=reporte_admin_{tipo}.csv'}
-        )
-    except Exception as e:
-        flash(f"Error al generar reporte administrativo: {e}", "danger")
-        return redirect(url_for('admin_reportes_list'))
+    return _report_download('admin', 'admin_reportes_list')
 
 
 # ==========================================

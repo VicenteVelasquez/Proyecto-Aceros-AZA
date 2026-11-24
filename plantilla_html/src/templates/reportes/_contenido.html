@@ -1,0 +1,141 @@
+<section class="aza-card mb-4">
+  <div class="aza-card-header"><span><i class="fa-solid fa-filter me-2"></i>REPORTES CON DATOS DE POSTGRESQL</span></div>
+  <div class="aza-card-body">
+    <p class="mb-3">Producción y calidad se calculan con registros de PostgreSQL. El Administrador también puede consultar bloqueos, desbloqueos y cuentas actualmente bloqueadas; la auditoría no incluye contraseñas ni tokens.</p>
+    {% if error %}
+    <div class="alert alert-danger" role="alert">{{ error }}</div>
+    {% endif %}
+    <form method="get" action="{{ url_for(page_endpoint) }}" class="row g-3 align-items-end">
+      <div class="col-lg-6">
+        <label for="tipo-reporte" class="form-label fw-bold">Tipo de reporte</label>
+        <select id="tipo-reporte" name="tipo" class="form-select">
+          {% for key, option in report_types.items() %}
+          <option value="{{ key }}" data-category="{{ option[1] }}" {% if filters.tipo|default('') == key %}selected{% endif %}>{{ option[0] }}</option>
+          {% endfor %}
+        </select>
+      </div>
+      <div class="col-sm-3">
+        <label for="desde" class="form-label fw-bold">Desde (opcional)</label>
+        <input type="date" id="desde" name="desde" class="form-control" value="{{ filters.desde|default('') }}">
+      </div>
+      <div class="col-sm-3">
+        <label for="hasta" class="form-label fw-bold">Hasta (inclusive)</label>
+        <input type="date" id="hasta" name="hasta" class="form-control" value="{{ filters.hasta|default('') }}">
+      </div>
+      <div class="col-sm-4" data-report-filter="produccion">
+        <label for="lote" class="form-label fw-bold">Código de lote contiene</label>
+        <input type="text" id="lote" name="lote" maxlength="80" class="form-control" placeholder="Ej.: LOTE-001" value="{{ filters.lote|default('') }}">
+      </div>
+      <div class="col-sm-4" data-report-filter="produccion">
+        <label for="receta" class="form-label fw-bold">Código de receta contiene</label>
+        <input type="text" id="receta" name="receta" maxlength="80" class="form-control" placeholder="Ej.: REC-01" value="{{ filters.receta|default('') }}">
+      </div>
+      <div class="col-sm-4" data-report-filter="produccion">
+        <label for="resultado" class="form-label fw-bold">Clasificación de lectura</label>
+        <select id="resultado" name="resultado" class="form-select">
+          <option value="">Todas</option>
+          {% for state in ['Aprobado','Rechazado','Sin receta'] %}
+          <option value="{{ state }}" {% if filters.resultado|default('') == state %}selected{% endif %}>{{ state }}</option>
+          {% endfor %}
+        </select>
+        <div class="form-text">Aplica a reportes de mediciones; los reportes de lotes no usan este filtro.</div>
+      </div>
+      {% if 'admin' in page_endpoint %}
+      <div class="col-sm-6" data-report-filter="auditoria">
+        <label for="usuario" class="form-label fw-bold">Nombre o ID de usuario afectado</label>
+        <input type="text" id="usuario" name="usuario" maxlength="80" class="form-control" placeholder="Nombre o ID de cuenta de prueba" value="{{ filters.usuario|default('') }}">
+      </div>
+      <div class="col-sm-6" data-report-filter="auditoria-eventos">
+        <label for="evento" class="form-label fw-bold">Tipo de evento</label>
+        <select id="evento" name="evento" class="form-select">
+          <option value="">Todos los eventos</option>
+          {% for event in ['Bloqueo automático','Desbloqueo manual'] %}
+          <option value="{{ event }}" {% if filters.evento|default('') == event %}selected{% endif %}>{{ event }}</option>
+          {% endfor %}
+        </select>
+      </div>
+      {% endif %}
+      <div class="col-12 d-flex gap-2 flex-wrap">
+        <button type="submit" class="btn btn-primary"><i class="fa-solid fa-magnifying-glass me-1"></i> Consultar</button>
+        {% for f, label in [('xlsx', 'Excel'), ('pdf', 'PDF'), ('docx', 'Word'), ('csv', 'CSV')] %}
+        <button type="submit" formaction="{{ url_for(download_endpoint) }}" name="formato" value="{{ f }}" class="btn btn-outline-success">
+          <i class="fa-solid fa-download me-1"></i>{{ label }}
+        </button>
+        {% endfor %}
+      </div>
+    </form>
+    {% if 'admin' in page_endpoint %}
+    <p class="small text-muted mt-3 mb-0" id="report-audit-note">
+      Auditoría: los bloqueos automáticos sólo quedan en el historial desde que se aplica
+      <code>sql/002_auditoria_bloqueos.sql</code>. Los desbloqueos manuales anteriores pueden
+      seguir disponibles en <code>auditoria_desbloqueos</code>. La expiración de 15 minutos no
+      es un desbloqueo manual y no se registra como tal.
+    </p>
+    {% endif %}
+  </div>
+</section>
+{% if report %}
+<section class="aza-card mb-4" aria-label="Resumen del reporte">
+  <div class="aza-card-header"><span>{{ report.title }}</span><span>Filas: {{ report.total }}</span></div>
+  <div class="aza-card-body">
+    <div class="row g-3">
+      {% for key, value in report.metrics.items() %}
+      <div class="col-sm-6 col-lg-3">
+        <div class="border rounded p-3 h-100 bg-white">
+          <div class="small text-muted">{{ key.replace('_', ' ')|capitalize }}{% if key == 'porcentaje' %} (lecturas clasificadas){% endif %}</div>
+          <div class="fs-4 fw-bold">{{ value if value is not none else 'Sin datos' }}{% if key == 'porcentaje' and value is not none %}%{% endif %}</div>
+        </div>
+      </div>
+      {% endfor %}
+    </div>
+    <p class="small mb-0 mt-3">Las fechas se interpretan según la zona horaria configurada en PostgreSQL. Los lotes cuentan registros de fabricación, no toneladas producidas.</p>
+  </div>
+</section>
+<section class="aza-card">
+  <div class="aza-card-header"><span><i class="fa-solid fa-table me-2"></i> Vista previa de datos</span></div>
+  <div class="aza-card-body">
+    {% if report.rows %}
+    <div class="table-responsive">
+      <table class="table table-striped table-bordered table-sm align-middle">
+        <thead>
+          <tr>{% for _, label in report.columns %}<th scope="col">{{ label }}</th>{% endfor %}</tr>
+        </thead>
+        <tbody>
+        {% for row in report.rows %}
+          <tr>{% for key, _ in report.columns %}<td>{{ row[key] if row[key] is not none else '—' }}</td>{% endfor %}</tr>
+        {% endfor %}
+        </tbody>
+      </table>
+    </div>
+    {% if report.preview_only %}<p class="small mb-0">Se muestran las primeras {{ report.rows|length }} filas de {{ report.total }}. La descarga incluye el conjunto filtrado hasta el límite indicado.</p>{% endif %}
+    {% else %}
+      <div class="alert alert-info mb-0">Sin registros para estos filtros. Puedes ampliar las fechas o retirar los filtros.</div>
+    {% endif %}
+    <p class="small mt-2 mb-0">Límites de descarga: 5.000 filas en Excel/CSV y 500 en PDF/Word. El servidor rechaza una descarga que supere el límite, sin truncar datos.</p>
+  </div>
+</section>
+{% endif %}
+
+{% if 'admin' in page_endpoint %}
+<script>
+(function () {
+  const selector = document.getElementById('tipo-reporte');
+  if (!selector) return;
+  const configure = () => {
+    const category = selector.selectedOptions[0]?.dataset.category || '';
+    const isAudit = category === 'auditoria' || category === 'bloqueados';
+    for (const element of document.querySelectorAll('[data-report-filter]')) {
+      const kind = element.dataset.reportFilter;
+      const visible = kind === 'produccion' ? !isAudit :
+         kind === 'auditoria-eventos' ? category === 'auditoria' : isAudit;
+      element.classList.toggle('d-none', !visible);
+      for (const field of element.querySelectorAll('input, select')) field.disabled = !visible;
+    }
+    const note = document.getElementById('report-audit-note');
+    if (note) note.classList.toggle('d-none', !isAudit);
+  };
+  selector.addEventListener('change', configure);
+  configure();
+})();
+</script>
+{% endif %}
